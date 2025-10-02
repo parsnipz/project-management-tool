@@ -1,5 +1,9 @@
 name: Deploy to GitHub Pages
 on: [push]
+permissions:
+  contents: write  # Required for pushing to gh-pages
+  pages: write     # Required for GitHub Pages deployment
+  id-token: write  # For OIDC if needed
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -13,3 +17,4 @@ jobs:
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: build
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
