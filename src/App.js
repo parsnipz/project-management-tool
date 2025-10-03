@@ -42,10 +42,13 @@ function App() {
   const [items, setItems] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [pinterestPins, setPinterestPins] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [gapiLoaded, setGapiLoaded] = useState(false);
+  
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState('');
   const appRef = useRef(null);
+  // eslint-disable-next-line no-unused-vars
   const [isDomReady, setIsDomReady] = useState(false);
 
   // Effect to initialize Firebase once DOM is confirmed ready
@@ -1065,6 +1068,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleInputChange = (id, field, value) => {
     const updatedItem = { ...spending.find(item => item.id === id), [field]: value };
     if (field === 'invoiced' || field === 'paid') {
