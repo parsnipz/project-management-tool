@@ -567,6 +567,7 @@ function NotesSection({ notes, db, user }) {
         setImageFile(null);
       } catch (error) {
         console.error('Error adding note:', error);
+        setError('Failed to add note: ' + (error.message || 'Unknown error'));
       }
     }
   };
