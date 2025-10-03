@@ -1330,10 +1330,10 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
               <td className="text-center">
                 <button
                   onClick={addSpending}
-                  className="btn btn-primary w-full py-1"
+                  className="btn btn-primary w-full py-1 text-white" // Changed to ensure visibility
                   disabled={!newSpending.item || !newSpending.date}
                 >
-                  <i className="fas fa-plus"></i>
+                  <i className="fas fa-plus"></i> Add
                 </button>
               </td>
             </tr>
@@ -1495,7 +1495,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                     {isEditing ? (
                       <button
                         onClick={() => editSpending(item.id)}
-                        className="btn btn-success w-full py-1"
+                        className="btn btn-success w-full py-1 text-white"
                       >
                         Save
                       </button>
@@ -1503,15 +1503,15 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                       <>
                         <button
                           onClick={() => setEditedItems({ ...editedItems, [item.id]: item })}
-                          className="text-blue-500 hover:text-blue-700 mr-2"
+                          className="btn btn-info w-full py-1 mb-1 text-white"
                         >
-                          <i className="fas fa-edit fa-sm" aria-label="Edit"></i>
+                          <i className="fas fa-edit"></i> Edit
                         </button>
                         <button
                           onClick={() => deleteSpending(item.id)}
-                          className="text-red-500 hover:text-red-700"
+                          className="btn btn-danger w-full py-1 text-white"
                         >
-                          <i className="fas fa-trash fa-sm" aria-label="Delete"></i>
+                          <i className="fas fa-trash"></i> Delete
                         </button>
                       </>
                     )}
