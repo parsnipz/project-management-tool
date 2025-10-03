@@ -1055,14 +1055,13 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     invoiced: '',
     paid: '',
     used: false,
-    owed: '', // Will be calculated
-    link: '', // New field for link
+    owed: '',
+    link: '',
   });
   const [editedItems, setEditedItems] = useState({});
   const [error, setError] = useState('');
-  const [linkMode, setLinkMode] = useState(false); // Toggle between upload and link
+  const [linkMode, setLinkMode] = useState(false);
 
-  // Calculate owed dynamically
   const calculateOwed = (invoiced, paid) => {
     const inv = parseFloat(invoiced) || 0;
     const pay = parseFloat(paid) || 0;
@@ -1092,10 +1091,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
     const file = event.target.files[0];
     if (file) {
-      const metadata = {
-        name: file.name,
-        parents: [GOOGLE_DRIVE_FOLDER_ID],
-      };
+      const metadata = { name: file.name, parents: [GOOGLE_DRIVE_FOLDER_ID] };
       const formData = new FormData();
       formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       formData.append('file', file);
@@ -1141,7 +1137,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
       owed: owed,
       link: newSpending.link || '',
       createdBy: user.email,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     });
     setNewSpending({
       date: '',
@@ -1178,7 +1174,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     setSpending(prevSpending => prevSpending.map(item => item.id === id ? updatedItem : item));
     setEditedItems(prev => {
       const newEdited = { ...prev };
-      delete newEdited[id]; // Reset editing state to make row non-editable
+      delete newEdited[id]; // Reset editing state
       return newEdited;
     });
     setError('');
@@ -1197,7 +1193,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
   };
 
-  // eslint-disable-next-line no-unused-vars
   const handleInputChange = (id, field, value) => {
     const updatedItem = { ...spending.find(item => item.id === id), [field]: value };
     if (field === 'invoiced' || field === 'paid') {
@@ -1208,7 +1203,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <center><h2 className="text-xl font-semibold mb-2">Spending Tracker</h2></center>
+      <h2 className="text-xl font-semibold mb-2">Spending Tracker</h2>
       <div className="mb-4">
         {error && <p className="text-red-500 mb-2">{error}</p>}
         <table className="table table-striped table-hover w-full" style={{ fontFamily: 'monospace' }}>
