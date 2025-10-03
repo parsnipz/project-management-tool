@@ -1193,6 +1193,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleInputChange = (id, field, value) => {
     const updatedItem = { ...spending.find(item => item.id === id), [field]: value };
     if (field === 'invoiced' || field === 'paid') {
