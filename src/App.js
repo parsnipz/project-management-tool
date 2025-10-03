@@ -2,9 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
-import { Chart as ChartJS } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import FullCalendar from '@fullcalendar/react'; // Correct import
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -31,7 +30,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 const GOOGLE_DRIVE_FOLDER_ID = '1YufVHMBcoVrd5nlJkEZlu0fYaqPuX3QG'; // Replace with env var if using .env
-const CLIENT_ID = '225080557033-u89ctvs8kq7bg2qp4fa86gc9mo9p8rf1.apps.googleusercontent.com'; // Replace with your actual Client ID
+// const CLIENT_ID = '225080557033-u89ctvs8kq7bg2qp4fa86gc9mo9p8rf1.apps.googleusercontent.com'; // Replace with your actual Client ID
 
 
 
@@ -239,7 +238,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
       });
       return () => chart.destroy();
     }
-  }, [tasks]);
+  }, [tasks, userColors]);
 
   // Helper function to adjust transparency
   const adjustTransparency = (color, opacity) => {
