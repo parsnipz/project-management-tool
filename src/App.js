@@ -540,8 +540,8 @@ const addTask = async () => {
 function NotesSection({ notes, db, user }) {
   const [newNote, setNewNote] = useState({ content: '', link: '', createdBy: '', imageUrl: '' });
   const [imageFile, setImageFile] = useState(null);
-  const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.']; // Fixed user list
-  const [selectedImage, setSelectedImage] = useState(null); // State for popup image
+  const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.'];
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const addNote = async () => {
     if (newNote.content && newNote.createdBy) {
@@ -563,6 +563,7 @@ function NotesSection({ notes, db, user }) {
         setImageFile(null);
       } catch (error) {
         console.error('Error adding note:', error);
+        setError('Failed to add note: ' + error.message);
       }
     }
   };
@@ -581,13 +582,13 @@ function NotesSection({ notes, db, user }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <center><h2 className="text-xl font-semibold mb-2">Project Notes</h2></center>
+      <h2 className="text-xl font-semibold mb-2">Project Notes</h2>
       <table className="table table-striped table-hover w-full" style={{ fontFamily: 'monospace' }}>
         <thead className="table-dark">
           <tr>
             <th style={{ width: '30%', textAlign: 'center' }}>Content</th>
             <th style={{ width: '15%', textAlign: 'center' }}>Link</th>
-            <th style={{ width: '15%', textAlign: 'center' }}>Attachment</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>File</th>
             <th style={{ width: '15%', textAlign: 'center' }}>Created By</th>
             <th style={{ width: '15%', textAlign: 'center' }}>Date Added</th>
             <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
@@ -617,7 +618,7 @@ function NotesSection({ notes, db, user }) {
             <td className="text-center">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={(e) => setImageFile(e.target.files[0])}
                 className="border p-1 rounded w-full text-center"
               />
@@ -665,12 +666,23 @@ function NotesSection({ notes, db, user }) {
               </td>
               <td className="text-center">
                 {note.imageUrl ? (
-                  <img
-                    src={note.imageUrl}
-                    alt={note.content}
-                    className="w-16 h-16 object-cover cursor-pointer"
-                    onClick={() => openImagePopup(note.imageUrl)}
-                  />
+                  note.imageUrl.endsWith('.pdf') ? (
+                    <a
+                      href={note.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 underline"
+                    >
+                      View PDF
+                    </a>
+                  ) : (
+                    <img
+                      src={note.imageUrl}
+                      alt={note.content}
+                      className="w-16 h-16 object-cover cursor-pointer"
+                      onClick={() => openImagePopup(note.imageUrl)}
+                    />
+                  )
                 ) : (
                   '-'
                 )}
@@ -700,7 +712,7 @@ function NotesSection({ notes, db, user }) {
       {selectedImage && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={closeImagePopup}>
           <div className="bg-white p-4 rounded-lg max-w-4xl max-h-[80vh] overflow-auto">
-            <img src={selectedImage} alt="Note" className="max-w-full max-h-[70vh] object-contain" />
+            <img src={selectedImage} alt="Note Image" className="max-w-full max-h-[70vh] object-contain" />
             <button
               onClick={closeImagePopup}
               className="mt-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
