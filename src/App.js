@@ -13,6 +13,7 @@ import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import './App.css';
+import { toZonedTime, format } from 'date-fns-tz';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDIngY4WuK5MZHhymOcbgMB0usEJkNyfz4",
@@ -141,13 +142,29 @@ const handleLogin = async () => {
   };
 
   if (!user) {
-    return (
-      <div ref={appRef} className="flex justify-center items-center h-screen bg-gray-100">
-        <button onClick={handleLogin} className="bg-blue-500 text-white px-4 py-2 rounded">Login with Google</button>
-        {error && <div className="text-red-500 mt-4">{error}</div>}
-      </div>
-    );
-  }
+  return (
+    <div ref={appRef} className="flex justify-center items-center h-screen bg-gray-100">
+      <button
+        onClick={handleLogin}
+        className="bg-blue-500 text-white px-4 py-2 rounded"
+        disabled={isLoggingIn}
+      >
+        {isLoggingIn ? (
+          <span className="flex items-center">
+            <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Logging in...
+          </span>
+        ) : (
+          'Login with Google'
+        )}
+      </button>
+      {error && <div className="text-red-500 mt-4">{error}</div>}
+    </div>
+  );
+}
 
     return (
     <div ref={appRef} className="p-4 bg-gray-100 min-h-screen">
@@ -172,7 +189,7 @@ const handleLogin = async () => {
 
 function GanttChart({ tasks, db, user, setTasks }) {
   const canvasRef = useRef(null);
-  const [newTask, setNewTask] = useState({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false });
+  const [newTask, setNewTask] = useState({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false, dependencyId: '' });
   const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.']; // Fixed user list
   const tableRef = useRef(null); // Reference to the table for hover effect
 
@@ -197,7 +214,10 @@ function GanttChart({ tasks, db, user, setTasks }) {
           datasets: [{
             label: 'Tasks',
             data: tasks.map(task => ({
-              x: [new Date(task.startDate + 'T00:00:00'), new Date(task.endDate + 'T00:00:00')], // Force local midnight
+              x: [
+        new Date(new Date(task.startDate).setUTCHours(0, 0, 0, 0)),
+        new Date(new Date(task.endDate).setUTCHours(0, 0, 0, 0))
+      ],// Force local midnight
               y: task.title,
             })),
             backgroundColor: tasks.map(task => {
@@ -216,7 +236,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
               type: 'time',
               time: { unit: 'day' },
               min: new Date('2025-10-01T00:00:00'),
-              max: new Date('2026-04-30T00:00:00'),
+              max: new Date('2025-12-31T00:00:00'),
               title: { display: true, text: 'Timeline' },
             },
             y: {
@@ -259,17 +279,17 @@ function GanttChart({ tasks, db, user, setTasks }) {
     return `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${opacity})`;
   };
 
-  const addTask = async () => {
-    if (newTask.title && newTask.startDate && newTask.endDate && newTask.assignedTo) {
-      await addDoc(collection(db, 'tasks'), {
-        ...newTask,
-        completed: false,
-        createdBy: user.email,
-        createdAt: new Date().toISOString(),
-      });
-      setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false });
-    }
-  };
+const addTask = async () => {
+  if (newTask.title && newTask.startDate && newTask.endDate && newTask.assignedTo) {
+    await addDoc(collection(db, 'tasks'), {
+      ...newTask,
+      completed: false,
+      createdBy: user.email,
+      createdAt: new Date().toISOString(),
+    });
+    setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false, dependencyId: '' });
+  }
+};
 
   const toggleCompleted = async (id) => {
     const task = tasks.find(t => t.id === id);
@@ -304,7 +324,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Gantt Chart (Oct 1, 2025 - Apr 30, 2026)</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Gantt Chart (Oct 1, 2025 - Dec 31, 2026)</h2></center>
       <canvas ref={canvasRef} style={{ width: '100%', height: '200px' }}></canvas>
       <div className="mt-2">
         <strong>Legend:</strong>
@@ -318,166 +338,197 @@ function GanttChart({ tasks, db, user, setTasks }) {
         </ul>
       </div>
       <div className="mt-4 flex gap-2">
+  <input
+    type="text"
+    value={newTask.title}
+    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+    placeholder="Task Title"
+    className="border p-1 rounded w-1/5"
+  />
+  <input
+    type="date"
+    min="2025-10-01"
+    max="2026-04-30"
+    value={newTask.startDate}
+    onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
+    className="border p-1 rounded w-1/5"
+  />
+  <input
+    type="date"
+    min="2025-10-01"
+    max="2026-04-30"
+    value={newTask.endDate}
+    onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
+    className="border p-1 rounded w-1/5"
+  />
+  <select
+    value={newTask.assignedTo}
+    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+    className="border p-1 rounded w-1/5"
+  >
+    <option value="">Select User</option>
+    {USERS.map((userOption, index) => (
+      <option key={index} value={userOption}>{userOption}</option>
+    ))}
+  </select>
+  <select
+    value={newTask.dependencyId}
+    onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
+    className="border p-1 rounded w-1/5"
+  >
+    <option value="">Dependency</option>
+    {tasks.map(task => (
+      <option key={task.id} value={task.id}>{task.title}</option>
+    ))}
+  </select>
+  <button
+    onClick={addTask}
+    className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-1/5"
+    disabled={!newTask.title || !newTask.startDate || !newTask.endDate || !newTask.assignedTo}
+  >
+    Add
+  </button>
+</div>
+      <table ref={tableRef} className="table table-striped table-hover w-full mt-4" style={{ fontFamily: 'monospace' }}>
+        <thead className="table-dark">
+        <tr>
+          <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
+          <th style={{ width: '5%', textAlign: 'center' }}>Status</th>
+          <th style={{ width: '25.5%', textAlign: 'center' }}>Title</th> {/* Reduced width */}
+          <th style={{ width: '8%', textAlign: 'center' }}>Start Date</th>
+          <th style={{ width: '8%', textAlign: 'center' }}>End Date</th>
+          <th style={{ width: '8%', textAlign: 'center' }}>Assigned</th>
+          <th style={{ width: '25.5%', textAlign: 'center' }}>Dependency</th> {/* New column */}
+          <th style={{ width: '5%', textAlign: 'center' }}>Created By</th>
+        </tr>
+      </thead>
+        <tbody>
+         {tasks.map((task) => (
+  <tr key={task.id}>
+    <td className="text-center">
+      <button
+        onClick={() => toggleCompleted(task.id)}
+        className="bg-transparent text-yellow-500 px-2 py-1 rounded mr-1 text-lg"
+        disabled={task.completed}
+        title="Completed"
+      >
+        ✓
+      </button>
+      <button
+        onClick={() => reOpenTask(task.id)}
+        className="bg-transparent text-green-500 px-2 py-1 rounded mr-1 text-lg"
+        disabled={!task.completed}
+        title="ReOpen"
+      >
+        🚪
+      </button>
+      <button
+        onClick={() => {
+          setNewTask({ ...task, id: task.id }); // Enable inline editing
+        }}
+        className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
+        title="Edit"
+      >
+        📝
+      </button>
+      <button
+        onClick={() => deleteTask(task.id)}
+        className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
+        title="Delete"
+      >
+        ✖
+      </button>
+    </td>
+    <td className="text-center">{task.completed ? '✓' : '☐'}</td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
         <input
           type="text"
           value={newTask.title}
           onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-          placeholder="Task Title"
-          className="border p-1 rounded w-1/5"
+          className="border p-1 rounded w-full text-center"
         />
+      ) : (
+        task.title
+      )}
+    </td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
         <input
           type="date"
           min="2025-10-01"
-          max="2026-04-30"
+          max="2025-12-31"
           value={newTask.startDate}
           onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
-          className="border p-1 rounded w-1/5"
+          className="border p-1 rounded w-full text-center"
         />
+      ) : (
+        format(toZonedTime(new Date(task.startDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
+      )}
+    </td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
         <input
           type="date"
           min="2025-10-01"
-          max="2026-04-30"
+          max="2025-12-31"
           value={newTask.endDate}
           onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
-          className="border p-1 rounded w-1/5"
+          className="border p-1 rounded w-full text-center"
         />
+      ) : (
+        format(toZonedTime(new Date(task.endDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
+      )}
+    </td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
         <select
           value={newTask.assignedTo}
           onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-          className="border p-1 rounded w-1/5"
+          className="border p-1 rounded w-full text-center"
         >
           <option value="">Select User</option>
           {USERS.map((userOption, index) => (
             <option key={index} value={userOption}>{userOption}</option>
           ))}
         </select>
-        <button
-          onClick={addTask}
-          className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-1/5"
-          disabled={!newTask.title || !newTask.startDate || !newTask.endDate || !newTask.assignedTo}
+      ) : (
+        task.assignedTo
+      )}
+    </td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
+        <select
+          value={newTask.dependencyId}
+          onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
+          className="border p-1 rounded w-full text-center"
         >
-          Add
-        </button>
-      </div>
-      <table ref={tableRef} className="table table-striped table-hover w-full mt-4" style={{ fontFamily: 'monospace' }}>
-        <thead className="table-dark">
-          <tr>
-            <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
-            <th style={{ width: '5%', textAlign: 'center' }}>Status</th>
-            <th style={{ width: '40%', textAlign: 'center' }}>Title</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>Start Date</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>End Date</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>Assigned</th>
-            <th style={{ width: '15%', textAlign: 'center' }}>Created By</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => (
-            <tr key={task.id}>
-              <td className="text-center">
-                <button
-                  onClick={() => toggleCompleted(task.id)}
-                  className="bg-transparent text-yellow-500 px-2 py-1 rounded mr-1 text-lg"
-                  disabled={task.completed}
-                  title="Completed"
-                >
-                  ✓
-                </button>
-                <button
-                  onClick={() => reOpenTask(task.id)}
-                  className="bg-transparent text-green-500 px-2 py-1 rounded mr-1 text-lg"
-                  disabled={!task.completed}
-                  title="ReOpen"
-                >
-                  🚪
-                </button>
-                <button
-                  onClick={() => {
-                    setNewTask({ ...task, id: task.id }); // Enable inline editing
-                  }}
-                  className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
-                  title="Edit"
-                >
-                  📝
-                </button>
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
-                  title="Delete"
-                >
-                  ✖
-                </button>
-              </td>
-              <td className="text-center">{task.completed ? '✓' : '☐'}</td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <input
-                    type="text"
-                    value={newTask.title}
-                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  />
-                ) : (
-                  task.title
-                )}
-              </td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <input
-                    type="date"
-                    min="2025-10-01"
-                    max="2026-04-30"
-                    value={newTask.startDate}
-                    onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  />
-                ) : (
-                  new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' })
-                )}
-              </td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <input
-                    type="date"
-                    min="2025-10-01"
-                    max="2026-04-30"
-                    value={newTask.endDate}
-                    onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  />
-                ) : (
-                  new Date(task.endDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' })
-                )}
-              </td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <select
-                    value={newTask.assignedTo}
-                    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  >
-                    <option value="">Select User</option>
-                    {USERS.map((userOption, index) => (
-                      <option key={index} value={userOption}>{userOption}</option>
-                    ))}
-                  </select>
-                ) : (
-                  task.assignedTo
-                )}
-              </td>
-              <td className="text-center">{task.createdBy}</td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <button
-                    onClick={() => saveEdit(task.id, newTask)}
-                    className="bg-green-500 text-white px-2 py-1 rounded text-sm"
-                  >
-                    Save
-                  </button>
-                ) : null}
-              </td>
-            </tr>
+          <option value="">None</option>
+          {tasks.filter(t => t.id !== task.id).map(taskOption => (
+            <option key={taskOption.id} value={taskOption.id}>{taskOption.title}</option>
           ))}
+        </select>
+      ) : (
+        tasks.find(t => t.id === task.dependencyId)?.title || 'None'
+      )}
+    </td>
+    <td className="text-center">{task.createdBy}</td>
+    <td className="text-center">
+      {task.id === newTask.id ? (
+        <button
+          onClick={() => saveEdit(task.id, newTask)}
+          className="bg-green-500 text-white px-2 py-1 rounded text-sm"
+        >
+          Save
+        </button>
+      ) : null}
+    </td>
+  </tr>
+))}
+
+
+
+
         </tbody>
       </table>
     </div>
@@ -487,18 +538,32 @@ function GanttChart({ tasks, db, user, setTasks }) {
 
 
 function NotesSection({ notes, db, user }) {
-  const [newNote, setNewNote] = useState({ content: '', link: '', createdBy: '' });
+  const [newNote, setNewNote] = useState({ content: '', link: '', createdBy: '', imageUrl: '' });
+  const [imageFile, setImageFile] = useState(null);
   const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.']; // Fixed user list
+  const [selectedImage, setSelectedImage] = useState(null); // State for popup image
 
   const addNote = async () => {
     if (newNote.content && newNote.createdBy) {
-      await addDoc(collection(db, 'notes'), {
-        content: newNote.content,
-        link: newNote.link,
-        createdBy: newNote.createdBy,
-        createdAt: new Date().toISOString()
-      });
-      setNewNote({ content: '', link: '', createdBy: '' });
+      try {
+        let imageUrl = newNote.imageUrl;
+        if (imageFile) {
+          const storageRef = ref(storage, `notes/${user.email}/${new Date().toISOString()}_${imageFile.name}`);
+          const snapshot = await uploadBytes(storageRef, imageFile);
+          imageUrl = await getDownloadURL(snapshot.ref);
+        }
+        await addDoc(collection(db, 'notes'), {
+          content: newNote.content,
+          link: newNote.link,
+          createdBy: newNote.createdBy,
+          createdAt: new Date().toISOString(),
+          imageUrl: imageUrl || '',
+        });
+        setNewNote({ content: '', link: '', createdBy: '', imageUrl: '' });
+        setImageFile(null);
+      } catch (error) {
+        console.error('Error adding note:', error);
+      }
     }
   };
 
@@ -506,16 +571,25 @@ function NotesSection({ notes, db, user }) {
     await deleteDoc(doc(db, 'notes', id));
   };
 
+  const openImagePopup = (url) => {
+    setSelectedImage(url);
+  };
+
+  const closeImagePopup = () => {
+    setSelectedImage(null);
+  };
+
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Project Notes</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Project Notes</h2></center>
       <table className="table table-striped table-hover w-full" style={{ fontFamily: 'monospace' }}>
         <thead className="table-dark">
           <tr>
-            <th style={{ width: '40%', textAlign: 'center' }}>Content</th>
-            <th style={{ width: '20%', textAlign: 'center' }}>Link</th>
-            <th style={{ width: '20%', textAlign: 'center' }}>Created By</th>
-            <th style={{ width: '20%', textAlign: 'center' }}>Date Added</th>
+            <th style={{ width: '30%', textAlign: 'center' }}>Content</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Link</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Attachment</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Created By</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Date Added</th>
             <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
           </tr>
         </thead>
@@ -537,6 +611,14 @@ function NotesSection({ notes, db, user }) {
                 value={newNote.link}
                 onChange={(e) => setNewNote({ ...newNote, link: e.target.value })}
                 placeholder="Link (optional)"
+                className="border p-1 rounded w-full text-center"
+              />
+            </td>
+            <td className="text-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files[0])}
                 className="border p-1 rounded w-full text-center"
               />
             </td>
@@ -581,6 +663,18 @@ function NotesSection({ notes, db, user }) {
                   '-'
                 )}
               </td>
+              <td className="text-center">
+                {note.imageUrl ? (
+                  <img
+                    src={note.imageUrl}
+                    alt={note.content}
+                    className="w-16 h-16 object-cover cursor-pointer"
+                    onClick={() => openImagePopup(note.imageUrl)}
+                  />
+                ) : (
+                  '-'
+                )}
+              </td>
               <td className="text-center">{note.createdBy}</td>
               <td className="text-center">
                 {new Date(note.createdAt).toLocaleDateString('en-US', {
@@ -601,6 +695,21 @@ function NotesSection({ notes, db, user }) {
           ))}
         </tbody>
       </table>
+
+      {/* Image Popup */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" onClick={closeImagePopup}>
+          <div className="bg-white p-4 rounded-lg max-w-4xl max-h-[80vh] overflow-auto">
+            <img src={selectedImage} alt="Note Image" className="max-w-full max-h-[70vh] object-contain" />
+            <button
+              onClick={closeImagePopup}
+              className="mt-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -766,7 +875,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Project Calendar</h2>
+      <center><h2 className="text-2xl font-bold text-gray-800 mb-4">Project Calendar</h2></center>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {/* FullCalendar */}
       <div className="mb-6">
@@ -932,9 +1041,11 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     paid: '',
     used: false,
     owed: '', // Will be calculated
+    link: '', // New field for link
   });
   const [editedItems, setEditedItems] = useState({});
   const [error, setError] = useState('');
+  const [linkMode, setLinkMode] = useState(false); // Toggle between upload and link
 
   // Calculate owed dynamically
   const calculateOwed = (invoiced, paid) => {
@@ -964,7 +1075,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
       setError('Google API not loaded. Please try again after signing in.');
       return;
     }
-
     const file = event.target.files[0];
     if (file) {
       const metadata = {
@@ -974,7 +1084,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
       const formData = new FormData();
       formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
       formData.append('file', file);
-
       try {
         const accessToken = window.gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token;
         const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
@@ -1008,13 +1117,14 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
     const owed = calculateOwed(newSpending.invoiced, newSpending.paid);
     await addDoc(collection(db, 'spending'), {
-      date: newSpending.date, // Stored as input value (e.g., "2025-10-02")
+      date: newSpending.date,
       item: newSpending.item,
       quote: parseFloat(newSpending.quote) || 0,
       invoiced: parseFloat(newSpending.invoiced) || 0,
       paid: parseFloat(newSpending.paid) || 0,
       used: newSpending.used,
       owed: owed,
+      link: newSpending.link || '',
       createdBy: user.email,
       createdAt: new Date().toISOString()
     });
@@ -1026,6 +1136,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
       paid: '',
       used: false,
       owed: '',
+      link: '',
     });
     setError('');
   };
@@ -1039,19 +1150,20 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     }
     const owed = calculateOwed(editedItem.invoiced, editedItem.paid);
     await updateDoc(doc(db, 'spending', id), {
-      date: editedItem.date, // Stored as input value
+      date: editedItem.date,
       item: editedItem.item,
       quote: parseFloat(editedItem.quote) || 0,
       invoiced: parseFloat(editedItem.invoiced) || 0,
       paid: parseFloat(editedItem.paid) || 0,
       used: editedItem.used,
-      owed: owed
+      owed: owed,
+      link: editedItem.link || '',
     });
     const updatedItem = { ...editedItem, owed, id };
     setSpending(prevSpending => prevSpending.map(item => item.id === id ? updatedItem : item));
     setEditedItems(prev => {
       const newEdited = { ...prev };
-      delete newEdited[id];
+      delete newEdited[id]; // Reset editing state to make row non-editable
       return newEdited;
     });
     setError('');
@@ -1081,7 +1193,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Spending Tracker</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Spending Tracker</h2></center>
       <div className="mb-4">
         {error && <p className="text-red-500 mb-2">{error}</p>}
         <table className="table table-striped table-hover w-full" style={{ fontFamily: 'monospace' }}>
@@ -1090,7 +1202,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
               <th style={{ width: '120px', textAlign: 'center' }}>Date</th>
               <th style={{ width: '280px', textAlign: 'center' }}>Item</th>
               <th style={{ width: '90px', textAlign: 'center' }}>Quote</th>
-              <th style={{ width: '80px', textAlign: 'center' }}>Upload</th>
+              <th style={{ width: '80px', textAlign: 'center' }}>File/Link</th>
               <th style={{ width: '90px', textAlign: 'center' }}>Invoiced</th>
               <th style={{ width: '90px', textAlign: 'center' }}>Paid</th>
               <th style={{ width: '60px', textAlign: 'center' }}>Used?</th>
@@ -1131,7 +1243,15 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                 </div>
               </td>
               <td className="text-center">
-                {!newSpending.link ? (
+                {linkMode ? (
+                  <input
+                    type="url"
+                    value={newSpending.link}
+                    onChange={(e) => setNewSpending({ ...newSpending, link: e.target.value })}
+                    placeholder="Enter link"
+                    className="border p-1 rounded w-full text-center"
+                  />
+                ) : (
                   <label className="btn btn-primary w-full py-1">
                     <i className="fas fa-upload"></i> Upload
                     <input
@@ -1140,16 +1260,13 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                       className="hidden"
                     />
                   </label>
-                ) : (
-                  <a
-                    href={newSpending.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 underline w-full block text-center"
-                  >
-                    View File
-                  </a>
                 )}
+                <button
+                  onClick={() => setLinkMode(!linkMode)}
+                  className="mt-1 bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-700 w-full"
+                >
+                  {linkMode ? 'Switch to Upload' : 'Switch to Link'}
+                </button>
               </td>
               <td className="text-center">
                 <div className="money-cell flex items-center justify-center">
@@ -1212,7 +1329,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
             {spending.map((item) => {
               const isEditing = !!editedItems[item.id];
               const editedItem = isEditing ? editedItems[item.id] : item;
-
               const handleInputChange = (field, value) => {
                 const updatedItem = { ...editedItem, [field]: value };
                 if (field === 'invoiced' || field === 'paid') {
@@ -1220,7 +1336,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                 }
                 setEditedItems({ ...editedItems, [item.id]: updatedItem });
               };
-
               return (
                 <tr key={item.id}>
                   <td className="text-center">
@@ -1232,7 +1347,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                         className="form-control border p-1 rounded w-full text-center"
                       />
                     ) : (
-                      item.date // Display raw date from DB to avoid offset
+                      item.date
                     )}
                   </td>
                   <td className="text-center">
@@ -1268,7 +1383,15 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                   </td>
                   <td className="text-center">
                     {isEditing ? (
-                      !editedItem.link ? (
+                      linkMode ? (
+                        <input
+                          type="url"
+                          value={editedItem.link}
+                          onChange={(e) => handleInputChange('link', e.target.value)}
+                          placeholder="Enter link"
+                          className="border p-1 rounded w-full text-center"
+                        />
+                      ) : (
                         <label className="btn btn-primary w-full py-1">
                           <i className="fas fa-upload"></i> Upload
                           <input
@@ -1277,15 +1400,6 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                             className="hidden"
                           />
                         </label>
-                      ) : (
-                        <a
-                          href={editedItem.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 underline w-full block text-center"
-                        >
-                          View File
-                        </a>
                       )
                     ) : (
                       item.link ? (
@@ -1295,18 +1409,19 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                           rel="noopener noreferrer"
                           className="text-blue-500 underline w-full block text-center"
                         >
-                          View File
+                          View
                         </a>
                       ) : (
-                        <label className="btn btn-primary w-full py-1">
-                          <i className="fas fa-upload"></i> Upload
-                          <input
-                            type="file"
-                            onChange={(e) => handleFileUpload(e, item.id)}
-                            className="hidden"
-                          />
-                        </label>
+                        '-'
                       )
+                    )}
+                    {isEditing && (
+                      <button
+                        onClick={() => setLinkMode(!linkMode)}
+                        className="mt-1 bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-700 w-full"
+                      >
+                        {linkMode ? 'Switch to Upload' : 'Switch to Link'}
+                      </button>
                     )}
                   </td>
                   <td className="text-center">
@@ -1465,7 +1580,7 @@ function ItemsUnderConsideration({ items, db, user }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Items Under Consideration</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Items Under Consideration</h2></center>
       <div className="mb-4">
         <select
           onChange={(e) => setSortBy(e.target.value)}
@@ -1634,7 +1749,7 @@ function ItemsUnderConsideration({ items, db, user }) {
 function GoogleDriveSection({ googleDriveFolder }) {
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Google Drive Invoices</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Google Drive Invoices</h2></center>
       <p className="mb-2">View and upload invoices to the shared folder:</p>
       <a 
         href={`https://drive.google.com/drive/folders/${googleDriveFolder}`} 
@@ -1656,7 +1771,7 @@ function GoogleDriveSection({ googleDriveFolder }) {
 function PinterestSection({ pins }) {
   return (
     <div className="bg-white p-4 rounded shadow">
-      <h2 className="text-xl font-semibold mb-2">Pinterest Board</h2>
+      <center><h2 className="text-xl font-semibold mb-2">Pinterest Board</h2></center>
       <div className="grid grid-cols-3 gap-2">
         {pins.map(pin => (
           <a key={pin.id} href={pin.url} target="_blank" rel="noopener noreferrer" className="block">
