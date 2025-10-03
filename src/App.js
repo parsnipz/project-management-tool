@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
@@ -171,6 +171,14 @@ function GanttChart({ tasks, db, user, setTasks }) {
   const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.']; // Fixed user list
   const tableRef = useRef(null); // Reference to the table for hover effect
 
+  // Move userColors here and wrap in useMemo
+  const userColors = useMemo(() => ({
+    'Brayden': 'rgba(255, 99, 132, 1.0)', // Red
+    'Cami': 'rgba(54, 162, 235, 1.0)',   // Blue
+    'Diane': 'rgba(75, 192, 192, 1.0)',  // Teal
+    'J.D.': 'rgba(255, 205, 86, 1.0)',   // Yellow
+  }), []);
+
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
@@ -287,13 +295,6 @@ function GanttChart({ tasks, db, user, setTasks }) {
         console.error('Delete failed:', error);
       }
     }
-  };
-
-  const userColors = {
-    'Brayden': 'rgba(255, 99, 132, 1.0)', // Red
-    'Cami': 'rgba(54, 162, 235, 1.0)',   // Blue
-    'Diane': 'rgba(75, 192, 192, 1.0)',  // Teal
-    'J.D.': 'rgba(255, 205, 86, 1.0)',   // Yellow
   };
 
   return (
