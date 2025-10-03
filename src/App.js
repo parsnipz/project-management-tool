@@ -1174,7 +1174,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
     setSpending(prevSpending => prevSpending.map(item => item.id === id ? updatedItem : item));
     setEditedItems(prev => {
       const newEdited = { ...prev };
-      delete newEdited[id]; // Reset editing state
+      delete newEdited[id];
       return newEdited;
     });
     setError('');
@@ -1330,7 +1330,7 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
               <td className="text-center">
                 <button
                   onClick={addSpending}
-                  className="btn btn-primary w-full py-1 text-white" // Changed to ensure visibility
+                  className="btn btn-success w-full py-1 text-white" // Green
                   disabled={!newSpending.item || !newSpending.date}
                 >
                   <i className="fas fa-plus"></i> Add
@@ -1495,7 +1495,8 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                     {isEditing ? (
                       <button
                         onClick={() => editSpending(item.id)}
-                        className="btn btn-success w-full py-1 text-white"
+                        className="btn btn-primary w-full py-1 text-white" // Blue
+                        style={{ backgroundColor: '#007bff' }} // Ensure blue
                       >
                         Save
                       </button>
@@ -1503,13 +1504,15 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
                       <>
                         <button
                           onClick={() => setEditedItems({ ...editedItems, [item.id]: item })}
-                          className="btn btn-info w-full py-1 mb-1 text-white"
+                          className="btn w-full py-1 mb-1 text-white"
+                          style={{ backgroundColor: '#007bff' }} // Blue for Edit
                         >
                           <i className="fas fa-edit"></i> Edit
                         </button>
                         <button
                           onClick={() => deleteSpending(item.id)}
-                          className="btn btn-danger w-full py-1 text-white"
+                          className="btn w-full py-1 text-white"
+                          style={{ backgroundColor: '#dc3545' }} // Red for Delete
                         >
                           <i className="fas fa-trash"></i> Delete
                         </button>
