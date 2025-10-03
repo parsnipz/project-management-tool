@@ -107,32 +107,34 @@ function App() {
     return () => unsubscribe && unsubscribe();
   }, [appRef]); // Triggered when appRef is set
 
-  const handleLogin = async () => {
-    if (isLoggingIn) return;
-    setIsLoggingIn(true);
-    const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/drive.file');
-    try {
-      console.log('Attempting login with popup');
-      const result = await signInWithPopup(auth, provider);
-      console.log('Login successful, result:', result.user);
-    } catch (error) {
-      console.error('Login error details:', {
-        code: error.code,
-        message: error.message,
-        email: error.email,
-        credential: error.credential,
-        customData: error.customData,
-      });
-      if (error.code === 'auth/cancelled-popup-request') {
-        console.warn('Popup request cancelled, possibly due to browser block. Please try again.');
-      } else {
-        setError('Login failed: ' + error.message + ' (Code: ' + error.code + ')');
-      }
-    } finally {
-      setIsLoggingIn(false);
+const handleLogin = async () => {
+  if (isLoggingIn) return;
+  setIsLoggingIn(true);
+  const provider = new GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
+  try {
+    console.log('Attempting login with popup');
+    const result = await signInWithPopup(auth, provider);
+    console.log('Login successful, result:', result.user);
+  } catch (error) {
+    console.error('Login error details:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+      customData: error.customData,
+    });
+    if (error.code === 'auth/cancelled-popup-request') {
+      setError('Popup request cancelled, possibly due to browser block. Please disable popup blockers or try again.');
+    } else if (error.code === 'auth/missing-initial-state' || error.message.includes('missing initial state')) {
+      setError('Login failed: Session state issue. Try clearing browser cache, using a different browser, or ensuring third-party cookies are enabled.');
+    } else {
+      setError('Login failed: ' + error.message + ' (Code: ' + error.code + ')');
     }
-  };
+  } finally {
+    setIsLoggingIn(false);
+  }
+};
 
   const handleLogout = async () => {
     await signOut(auth);
