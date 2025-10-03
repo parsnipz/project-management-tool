@@ -1330,7 +1330,8 @@ function SpendingTracker({ spending, db, user, setSpending, gapiLoaded }) {
               <td className="text-center">
                 <button
                   onClick={addSpending}
-                  className="btn btn-success w-full py-1 text-white" // Green
+                  className="btn w-full py-1 text-white"
+                  style={{ backgroundColor: '#28a745' }} // Explicit green
                   disabled={!newSpending.item || !newSpending.date}
                 >
                   <i className="fas fa-plus"></i> Add
