@@ -542,23 +542,27 @@ function NotesSection({ notes, db, user }) {
   const [imageFile, setImageFile] = useState(null);
   const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.'];
   const [selectedImage, setSelectedImage] = useState(null);
+  const [error, setError] = useState(''); // Ensure setError is accessible (e.g., via context or prop)
 
   const addNote = async () => {
     if (newNote.content && newNote.createdBy) {
       try {
         let imageUrl = newNote.imageUrl;
         if (imageFile) {
+          console.log('Uploading file:', imageFile.name);
           const storageRef = ref(storage, `notes/${user.email}/${new Date().toISOString()}_${imageFile.name}`);
           const snapshot = await uploadBytes(storageRef, imageFile);
           imageUrl = await getDownloadURL(snapshot.ref);
+          console.log('Upload successful, URL:', imageUrl);
         }
-        await addDoc(collection(db, 'notes'), {
+        const noteRef = await addDoc(collection(db, 'notes'), {
           content: newNote.content,
           link: newNote.link,
           createdBy: newNote.createdBy,
           createdAt: new Date().toISOString(),
           imageUrl: imageUrl || '',
         });
+        console.log('Note added with ID:', noteRef.id, 'and imageUrl:', imageUrl);
         setNewNote({ content: '', link: '', createdBy: '', imageUrl: '' });
         setImageFile(null);
       } catch (error) {
@@ -582,6 +586,7 @@ function NotesSection({ notes, db, user }) {
   return (
     <div className="bg-white p-4 rounded shadow">
       <h2 className="text-xl font-semibold mb-2">Project Notes</h2>
+      {error && <p className="text-red-500 mb-2">{error}</p>}
       <table className="table table-striped table-hover w-full" style={{ fontFamily: 'monospace' }}>
         <thead className="table-dark">
           <tr>
@@ -594,7 +599,6 @@ function NotesSection({ notes, db, user }) {
           </tr>
         </thead>
         <tbody>
-          {/* Input row for adding new note */}
           <tr>
             <td className="text-center">
               <input
@@ -645,7 +649,6 @@ function NotesSection({ notes, db, user }) {
               </button>
             </td>
           </tr>
-          {/* Existing notes */}
           {notes.map((note) => (
             <tr key={note.id}>
               <td className="text-center">{note.content}</td>
@@ -665,7 +668,7 @@ function NotesSection({ notes, db, user }) {
               </td>
               <td className="text-center">
                 {note.imageUrl ? (
-                  note.imageUrl.endsWith('.pdf') ? (
+                  note.imageUrl.toLowerCase().includes('.pdf') ? (
                     <a
                       href={note.imageUrl}
                       target="_blank"
