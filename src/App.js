@@ -226,7 +226,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
       const taskCount = sortedTasks.length || 1;
-      const canvasHeight = Math.max(50, taskCount * 20 + 10);
+      const canvasHeight = Math.max(40, taskCount * 10 + 10);
       canvasRef.current.style.height = `${canvasHeight}px`;
       const chart = new Chart(ctx, {
         type: 'bar',
