@@ -274,7 +274,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
               if (taskTitle && tableRef.current) {
                 const rows = tableRef.current.getElementsByTagName('tr');
                 for (let row of rows) {
-                  if (row.cells[2].textContent === taskTitle) {
+                  if (row.cells[1].textContent === taskTitle) { // Changed to index 1 for Task (title)
                     row.style.backgroundColor = 'rgba(255, 255, 204, 0.5)';
                   } else {
                     row.style.backgroundColor = '';
@@ -386,6 +386,16 @@ function GanttChart({ tasks, db, user, setTasks }) {
         </ul>
       </div>
       <div className="mt-4 flex gap-2">
+        <select
+          value={newTask.phase}
+          onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
+          className="border p-1 rounded w-1/6"
+        >
+          <option value="">Select Phase</option>
+          {PHASES.map((phase, index) => (
+            <option key={index} value={phase}>{phase}</option>
+          ))}
+        </select>
         <input
           type="text"
           value={newTask.title}
@@ -393,6 +403,16 @@ function GanttChart({ tasks, db, user, setTasks }) {
           placeholder="Task Title"
           className="border p-1 rounded w-1/6"
         />
+        <select
+          value={newTask.assignedTo}
+          onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+          className="border p-1 rounded w-1/6"
+        >
+          <option value="">Select User</option>
+          {USERS.map((userOption, index) => (
+            <option key={index} value={userOption}>{userOption}</option>
+          ))}
+        </select>
         <input
           type="date"
           min="2025-10-01"
@@ -409,26 +429,6 @@ function GanttChart({ tasks, db, user, setTasks }) {
           onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
           className="border p-1 rounded w-1/6"
         />
-        <select
-          value={newTask.assignedTo}
-          onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-          className="border p-1 rounded w-1/6"
-        >
-          <option value="">Select User</option>
-          {USERS.map((userOption, index) => (
-            <option key={index} value={userOption}>{userOption}</option>
-          ))}
-        </select>
-        <select
-          value={newTask.phase}
-          onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
-          className="border p-1 rounded w-1/6"
-        >
-          <option value="">Select Phase</option>
-          {PHASES.map((phase, index) => (
-            <option key={index} value={phase}>{phase}</option>
-          ))}
-        </select>
         <select
           value={newTask.dependencyId}
           onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
@@ -450,14 +450,14 @@ function GanttChart({ tasks, db, user, setTasks }) {
       <table ref={tableRef} className="table table-striped table-hover w-full mt-4" style={{ fontFamily: 'monospace' }}>
         <thead className="table-dark">
           <tr>
-            <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>Status</th>
-            <th style={{ width: '20%', textAlign: 'center' }}>Title</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Phase</th>
+            <th style={{ width: '20%', textAlign: 'center' }}>Task</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Assigned</th>
             <th style={{ width: '10%', textAlign: 'center' }}>Start Date</th>
             <th style={{ width: '10%', textAlign: 'center' }}>End Date</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>Assigned</th>
-            <th style={{ width: '10%', textAlign: 'center' }}>Phase</th>
             <th style={{ width: '20%', textAlign: 'center' }}>Dependency</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Status</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
             <th style={{ width: '15%', textAlign: 'center' }}>Created By</th>
           </tr>
         </thead>
@@ -465,45 +465,19 @@ function GanttChart({ tasks, db, user, setTasks }) {
           {sortedTasks.map((task) => (
             <tr key={task.id}>
               <td className="text-center">
-                <button
-                  onClick={() => {
-                    setNewTask({ ...task, id: task.id, status: task.status || 'Not Started' });
-                  }}
-                  className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
-                  title="Edit"
-                >
-                  📝
-                </button>
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
-                  title="Delete"
-                >
-                  ✖
-                </button>
-                {task.id === newTask.id && (
-                  <button
-                    onClick={() => setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' })}
-                    className="bg-gray-500 text-white px-2 py-1 rounded text-sm"
-                    title="Cancel"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </td>
-              <td className="text-center">
                 {task.id === newTask.id ? (
                   <select
-                    value={newTask.status}
-                    onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                    value={newTask.phase}
+                    onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
                     className="border p-1 rounded w-full text-center"
                   >
-                    {STATUSES.map((status, index) => (
-                      <option key={index} value={status}>{status}</option>
+                    <option value="">Select Phase</option>
+                    {PHASES.map((phase, index) => (
+                      <option key={index} value={phase}>{phase}</option>
                     ))}
                   </select>
                 ) : (
-                  task.status || 'Not Started'
+                  task.phase
                 )}
               </td>
               <td className="text-center">
@@ -516,6 +490,22 @@ function GanttChart({ tasks, db, user, setTasks }) {
                   />
                 ) : (
                   task.title
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.assignedTo}
+                    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    <option value="">Select User</option>
+                    {USERS.map((userOption, index) => (
+                      <option key={index} value={userOption}>{userOption}</option>
+                    ))}
+                  </select>
+                ) : (
+                  task.assignedTo
                 )}
               </td>
               <td className="text-center">
@@ -549,38 +539,6 @@ function GanttChart({ tasks, db, user, setTasks }) {
               <td className="text-center">
                 {task.id === newTask.id ? (
                   <select
-                    value={newTask.assignedTo}
-                    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  >
-                    <option value="">Select User</option>
-                    {USERS.map((userOption, index) => (
-                      <option key={index} value={userOption}>{userOption}</option>
-                    ))}
-                  </select>
-                ) : (
-                  task.assignedTo
-                )}
-              </td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <select
-                    value={newTask.phase}
-                    onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
-                    className="border p-1 rounded w-full text-center"
-                  >
-                    <option value="">Select Phase</option>
-                    {PHASES.map((phase, index) => (
-                      <option key={index} value={phase}>{phase}</option>
-                    ))}
-                  </select>
-                ) : (
-                  task.phase
-                )}
-              </td>
-              <td className="text-center">
-                {task.id === newTask.id ? (
-                  <select
                     value={newTask.dependencyId}
                     onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
                     className="border p-1 rounded w-full text-center"
@@ -592,6 +550,48 @@ function GanttChart({ tasks, db, user, setTasks }) {
                   </select>
                 ) : (
                   tasks.find(t => t.id === task.dependencyId)?.title || 'None'
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.status}
+                    onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    {STATUSES.map((status, index) => (
+                      <option key={index} value={status}>{status}</option>
+                    ))}
+                  </select>
+                ) : (
+                  task.status || 'Not Started'
+                )}
+              </td>
+              <td className="text-center">
+                <button
+                  onClick={() => {
+                    setNewTask({ ...task, id: task.id, status: task.status || 'Not Started' });
+                  }}
+                  className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
+                  title="Edit"
+                >
+                  📝
+                </button>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
+                  title="Delete"
+                >
+                  ✖
+                </button>
+                {task.id === newTask.id && (
+                  <button
+                    onClick={() => setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' })}
+                    className="bg-gray-500 text-white px-2 py-1 rounded text-sm"
+                    title="Cancel"
+                  >
+                    Cancel
+                  </button>
                 )}
               </td>
               <td className="text-center">{task.createdBy}</td>
