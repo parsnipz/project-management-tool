@@ -301,7 +301,8 @@ function GanttChart({ tasks, db, user, setTasks }) {
     }
   };
 
-  const updateTaskStatus = async (id, newStatus) => {
+    // eslint-disable-next-line no-unused-vars
+    const updateTaskStatus = async (id, newStatus) => {
     const task = tasks.find(t => t.id === id);
     if (task) {
       if (newStatus === 'Pending' && !task.dependencyId) {
