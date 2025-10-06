@@ -210,26 +210,38 @@ function GanttChart({ tasks, db, user, setTasks }) {
     'J.D.': 'rgba(255, 205, 86, 1.0)',   // Yellow
   }), []);
 
+  // Sort tasks by startDate (primary) and endDate (secondary)
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      const startDateA = new Date(a.startDate).getTime();
+      const startDateB = new Date(b.startDate).getTime();
+      if (startDateA !== startDateB) {
+        return startDateA - startDateB; // Primary sort by startDate
+      }
+      return new Date(a.endDate).getTime() - new Date(b.endDate).getTime(); // Secondary sort by endDate
+    });
+  }, [tasks]);
+
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
-      const taskCount = tasks.length || 1;
+      const taskCount = sortedTasks.length || 1;
       const canvasHeight = Math.max(50, taskCount * 20 + 10);
       canvasRef.current.style.height = `${canvasHeight}px`;
       const chart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: tasks.map(task => task.title),
+          labels: sortedTasks.map(task => task.title),
           datasets: [{
             label: 'Tasks',
-            data: tasks.map(task => ({
+            data: sortedTasks.map(task => ({
               x: [
                 new Date(new Date(task.startDate).setUTCHours(0, 0, 0, 0)),
                 new Date(new Date(task.endDate).setUTCHours(0, 0, 0, 0))
               ],
               y: task.title,
             })),
-            backgroundColor: tasks.map(task => {
+            backgroundColor: sortedTasks.map(task => {
               const baseColor = userColors[task.assignedTo] || 'rgba(0, 0, 0, 0.5)';
               return task.status === 'Complete' ? adjustTransparency(baseColor, 0.5) : baseColor;
             }),
@@ -258,7 +270,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
           onHover: (event, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              const taskTitle = tasks[index]?.title;
+              const taskTitle = sortedTasks[index]?.title;
               if (taskTitle && tableRef.current) {
                 const rows = tableRef.current.getElementsByTagName('tr');
                 for (let row of rows) {
@@ -280,7 +292,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
       });
       return () => chart.destroy();
     }
-  }, [tasks, userColors]);
+  }, [sortedTasks, userColors]);
 
   const adjustTransparency = (color, opacity) => {
     const rgba = color.match(/\d+\.?\d*/g);
@@ -301,6 +313,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
         setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
       } catch (error) {
         console.error('Error adding task:', error);
+        alert('Failed to add task: ' + error.message);
       }
     }
   };
@@ -352,6 +365,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
         console.log(`Deleted task with ID: ${id}`);
       } catch (error) {
         console.error('Delete failed:', error);
+        alert('Failed to delete task: ' + error.message);
       }
     }
   };
@@ -421,7 +435,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
           className="border p-1 rounded w-1/6"
         >
           <option value="">Dependency</option>
-          {tasks.map(task => (
+          {sortedTasks.map(task => (
             <option key={task.id} value={task.id}>{task.title}</option>
           ))}
         </select>
@@ -448,7 +462,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
           </tr>
         </thead>
         <tbody>
-          {tasks.map((task) => (
+          {sortedTasks.map((task) => (
             <tr key={task.id}>
               <td className="text-center">
                 <button
@@ -467,6 +481,15 @@ function GanttChart({ tasks, db, user, setTasks }) {
                 >
                   ✖
                 </button>
+                {task.id === newTask.id && (
+                  <button
+                    onClick={() => setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' })}
+                    className="bg-gray-500 text-white px-2 py-1 rounded text-sm"
+                    title="Cancel"
+                  >
+                    Cancel
+                  </button>
+                )}
               </td>
               <td className="text-center">
                 {task.id === newTask.id ? (
@@ -563,7 +586,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
                     className="border p-1 rounded w-full text-center"
                   >
                     <option value="">None</option>
-                    {tasks.filter(t => t.id !== task.id).map(taskOption => (
+                    {sortedTasks.filter(t => t.id !== task.id).map(taskOption => (
                       <option key={taskOption.id} value={taskOption.id}>{taskOption.title}</option>
                     ))}
                   </select>
