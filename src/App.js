@@ -291,49 +291,56 @@ function GanttChart({ tasks, db, user, setTasks }) {
     if (newTask.title && newTask.startDate && newTask.endDate && newTask.assignedTo && newTask.phase) {
       const dependency = newTask.dependencyId ? tasks.find(t => t.id === newTask.dependencyId) : null;
       const status = dependency && dependency.status !== 'Complete' ? 'Pending' : 'Not Started';
-      await addDoc(collection(db, 'tasks'), {
-        ...newTask,
-        status,
-        createdBy: user.email,
-        createdAt: new Date().toISOString(),
-      });
-      setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
-    }
-  };
-
-    // eslint-disable-next-line no-unused-vars
-    const updateTaskStatus = async (id, newStatus) => {
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-      if (newStatus === 'Pending' && !task.dependencyId) {
-        alert('Cannot set to Pending without a dependency.');
-        return;
-      }
-      if (task.dependencyId && newStatus === 'Active') {
-        const dependency = tasks.find(t => t.id === task.dependencyId);
-        if (dependency && dependency.status !== 'Complete') {
-          alert('Cannot set to Active: Dependency is not Complete.');
-          return;
-        }
-      }
-      await updateDoc(doc(db, 'tasks', id), { status: newStatus });
-      const dependentTasks = tasks.filter(t => t.dependencyId === id);
-      for (const depTask of dependentTasks) {
-        const newDepStatus = newStatus === 'Complete' ? 'Not Started' : 'Pending';
-        await updateDoc(doc(db, 'tasks', depTask.id), { status: newDepStatus });
+      try {
+        await addDoc(collection(db, 'tasks'), {
+          ...newTask,
+          status,
+          createdBy: user.email,
+          createdAt: new Date().toISOString(),
+        });
+        setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
+      } catch (error) {
+        console.error('Error adding task:', error);
       }
     }
   };
 
   const saveEdit = async (id, updatedTask) => {
-    if (updatedTask.title && updatedTask.startDate && updatedTask.endDate && updatedTask.assignedTo && updatedTask.phase) {
-      const dependency = updatedTask.dependencyId ? tasks.find(t => t.id === updatedTask.dependencyId) : null;
-      const status = updatedTask.status === 'Pending' && (!dependency || dependency.status === 'Complete') 
-        ? 'Not Started' 
-        : updatedTask.status;
+    if (!updatedTask.title || !updatedTask.startDate || !updatedTask.endDate || !updatedTask.assignedTo || !updatedTask.phase) {
+      alert('All fields (Title, Start Date, End Date, Assigned To, Phase) are required.');
+      return;
+    }
+    if (!STATUSES.includes(updatedTask.status)) {
+      alert('Invalid status. Please select a valid status.');
+      return;
+    }
+    const dependency = updatedTask.dependencyId ? tasks.find(t => t.id === updatedTask.dependencyId) : null;
+    let status = updatedTask.status;
+    if (status === 'Pending' && !dependency) {
+      alert('Cannot set to Pending without a dependency.');
+      return;
+    }
+    if (dependency && status === 'Active' && dependency.status !== 'Complete') {
+      alert('Cannot set to Active: Dependency is not Complete.');
+      return;
+    }
+    if (status === 'Pending' && dependency && dependency.status === 'Complete') {
+      status = 'Not Started';
+    }
+    try {
       await updateDoc(doc(db, 'tasks', id), { ...updatedTask, status });
       setTasks(prevTasks => prevTasks.map(task => task.id === id ? { ...task, ...updatedTask, status } : task));
+      // Update dependent tasks if this task's status changed to Complete
+      if (status === 'Complete') {
+        const dependentTasks = tasks.filter(t => t.dependencyId === id);
+        for (const depTask of dependentTasks) {
+          await updateDoc(doc(db, 'tasks', depTask.id), { status: 'Not Started' });
+        }
+      }
       setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      alert('Failed to update task: ' + error.message);
     }
   };
 
@@ -446,7 +453,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
               <td className="text-center">
                 <button
                   onClick={() => {
-                    setNewTask({ ...task, id: task.id });
+                    setNewTask({ ...task, id: task.id, status: task.status || 'Not Started' });
                   }}
                   className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
                   title="Edit"
@@ -473,7 +480,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
                     ))}
                   </select>
                 ) : (
-                  task.status
+                  task.status || 'Not Started'
                 )}
               </td>
               <td className="text-center">
