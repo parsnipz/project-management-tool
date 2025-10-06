@@ -189,11 +189,20 @@ const handleLogin = async () => {
 
 function GanttChart({ tasks, db, user, setTasks }) {
   const canvasRef = useRef(null);
-  const [newTask, setNewTask] = useState({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false, dependencyId: '' });
-  const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.']; // Fixed user list
-  const tableRef = useRef(null); // Reference to the table for hover effect
+  const [newTask, setNewTask] = useState({ 
+    title: '', 
+    startDate: '', 
+    endDate: '', 
+    assignedTo: '', 
+    phase: '', 
+    status: 'Not Started', 
+    dependencyId: '' 
+  });
+  const USERS = ['Brayden', 'Cami', 'Diane', 'J.D.'];
+  const PHASES = ['Planning', 'Design', 'Procurement', 'Construction', 'Closeout'];
+  const STATUSES = ['Not Started', 'Pending', 'Active', 'Complete'];
+  const tableRef = useRef(null);
 
-  // Move userColors here and wrap in useMemo
   const userColors = useMemo(() => ({
     'Brayden': 'rgba(255, 99, 132, 1.0)', // Red
     'Cami': 'rgba(54, 162, 235, 1.0)',   // Blue
@@ -204,33 +213,33 @@ function GanttChart({ tasks, db, user, setTasks }) {
   useEffect(() => {
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
-      const taskCount = tasks.length || 1; // Ensure at least 1 task for minimum height
-      const canvasHeight = Math.max(50, taskCount * 20 + 10); // Minimum 100px, 40px per task + 20px padding
+      const taskCount = tasks.length || 1;
+      const canvasHeight = Math.max(50, taskCount * 20 + 10);
       canvasRef.current.style.height = `${canvasHeight}px`;
       const chart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: tasks.map(task => task.title), // Task names on y-axis
+          labels: tasks.map(task => task.title),
           datasets: [{
             label: 'Tasks',
             data: tasks.map(task => ({
               x: [
-        new Date(new Date(task.startDate).setUTCHours(0, 0, 0, 0)),
-        new Date(new Date(task.endDate).setUTCHours(0, 0, 0, 0))
-      ],// Force local midnight
+                new Date(new Date(task.startDate).setUTCHours(0, 0, 0, 0)),
+                new Date(new Date(task.endDate).setUTCHours(0, 0, 0, 0))
+              ],
               y: task.title,
             })),
             backgroundColor: tasks.map(task => {
-              const baseColor = userColors[task.assignedTo] || 'rgba(0, 0, 0, 0.5)'; // Default gray
-              return task.completed ? adjustTransparency(baseColor, 0.5) : baseColor; // 50% transparent when completed
+              const baseColor = userColors[task.assignedTo] || 'rgba(0, 0, 0, 0.5)';
+              return task.status === 'Complete' ? adjustTransparency(baseColor, 0.5) : baseColor;
             }),
             barPercentage: 1.0,
             categoryPercentage: 1.0,
-            barThickness: 40, // Changed to 40px bar height
+            barThickness: 40,
           }],
         },
         options: {
-          indexAxis: 'y', // Horizontal bars
+          indexAxis: 'y',
           scales: {
             x: {
               type: 'time',
@@ -253,8 +262,8 @@ function GanttChart({ tasks, db, user, setTasks }) {
               if (taskTitle && tableRef.current) {
                 const rows = tableRef.current.getElementsByTagName('tr');
                 for (let row of rows) {
-                  if (row.cells[2].textContent === taskTitle) { // Column 2 is Title
-                    row.style.backgroundColor = 'rgba(255, 255, 204, 0.5)'; // Soft yellow
+                  if (row.cells[2].textContent === taskTitle) {
+                    row.style.backgroundColor = 'rgba(255, 255, 204, 0.5)';
                   } else {
                     row.style.backgroundColor = '';
                   }
@@ -273,41 +282,61 @@ function GanttChart({ tasks, db, user, setTasks }) {
     }
   }, [tasks, userColors]);
 
-  // Helper function to adjust transparency
   const adjustTransparency = (color, opacity) => {
     const rgba = color.match(/\d+\.?\d*/g);
     return `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${opacity})`;
   };
 
-const addTask = async () => {
-  if (newTask.title && newTask.startDate && newTask.endDate && newTask.assignedTo) {
-    await addDoc(collection(db, 'tasks'), {
-      ...newTask,
-      completed: false,
-      createdBy: user.email,
-      createdAt: new Date().toISOString(),
-    });
-    setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', completed: false, dependencyId: '' });
-  }
-};
-
-  const toggleCompleted = async (id) => {
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-      await updateDoc(doc(db, 'tasks', id), { completed: !task.completed });
+  const addTask = async () => {
+    if (newTask.title && newTask.startDate && newTask.endDate && newTask.assignedTo && newTask.phase) {
+      // Check if dependency exists and is not complete
+      const dependency = newTask.dependencyId ? tasks.find(t => t.id === newTask.dependencyId) : null;
+      const status = dependency && dependency.status !== 'Complete' ? 'Pending' : 'Not Started';
+      await addDoc(collection(db, 'tasks'), {
+        ...newTask,
+        status,
+        createdBy: user.email,
+        createdAt: new Date().toISOString(),
+      });
+      setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
     }
   };
 
-  const reOpenTask = async (id) => {
+  const updateTaskStatus = async (id, newStatus) => {
     const task = tasks.find(t => t.id === id);
-    if (task && task.completed) {
-      await updateDoc(doc(db, 'tasks', id), { completed: false });
+    if (task) {
+      // Validate status change
+      if (newStatus === 'Pending' && !task.dependencyId) {
+        alert('Cannot set to Pending without a dependency.');
+        return;
+      }
+      if (task.dependencyId && newStatus === 'Active') {
+        const dependency = tasks.find(t => t.id === task.dependencyId);
+        if (dependency && dependency.status !== 'Complete') {
+          alert('Cannot set to Active: Dependency is not Complete.');
+          return;
+        }
+      }
+      await updateDoc(doc(db, 'tasks', id), { status: newStatus });
+      // Update dependent tasks
+      const dependentTasks = tasks.filter(t => t.dependencyId === id);
+      for (const depTask of dependentTasks) {
+        const newDepStatus = newStatus === 'Complete' ? 'Not Started' : 'Pending';
+        await updateDoc(doc(db, 'tasks', depTask.id), { status: newDepStatus });
+      }
     }
   };
 
   const saveEdit = async (id, updatedTask) => {
-    await updateDoc(doc(db, 'tasks', id), updatedTask);
-    setTasks(prevTasks => prevTasks.map(task => task.id === id ? { ...task, ...updatedTask } : task));
+    if (updatedTask.title && updatedTask.startDate && updatedTask.endDate && updatedTask.assignedTo && updatedTask.phase) {
+      const dependency = updatedTask.dependencyId ? tasks.find(t => t.id === updatedTask.dependencyId) : null;
+      const status = updatedTask.status === 'Pending' && (!dependency || dependency.status === 'Complete') 
+        ? 'Not Started' 
+        : updatedTask.status;
+      await updateDoc(doc(db, 'tasks', id), { ...updatedTask, status });
+      setTasks(prevTasks => prevTasks.map(task => task.id === id ? { ...task, ...updatedTask, status } : task));
+      setNewTask({ title: '', startDate: '', endDate: '', assignedTo: '', phase: '', status: 'Not Started', dependencyId: '' });
+    }
   };
 
   const deleteTask = async (id) => {
@@ -338,197 +367,226 @@ const addTask = async () => {
         </ul>
       </div>
       <div className="mt-4 flex gap-2">
-  <input
-    type="text"
-    value={newTask.title}
-    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-    placeholder="Task Title"
-    className="border p-1 rounded w-1/5"
-  />
-  <input
-    type="date"
-    min="2025-10-01"
-    max="2026-04-30"
-    value={newTask.startDate}
-    onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
-    className="border p-1 rounded w-1/5"
-  />
-  <input
-    type="date"
-    min="2025-10-01"
-    max="2026-04-30"
-    value={newTask.endDate}
-    onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
-    className="border p-1 rounded w-1/5"
-  />
-  <select
-    value={newTask.assignedTo}
-    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-    className="border p-1 rounded w-1/5"
-  >
-    <option value="">Select User</option>
-    {USERS.map((userOption, index) => (
-      <option key={index} value={userOption}>{userOption}</option>
-    ))}
-  </select>
-  <select
-    value={newTask.dependencyId}
-    onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
-    className="border p-1 rounded w-1/5"
-  >
-    <option value="">Dependency</option>
-    {tasks.map(task => (
-      <option key={task.id} value={task.id}>{task.title}</option>
-    ))}
-  </select>
-  <button
-    onClick={addTask}
-    className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-1/5"
-    disabled={!newTask.title || !newTask.startDate || !newTask.endDate || !newTask.assignedTo}
-  >
-    Add
-  </button>
-</div>
-      <table ref={tableRef} className="table table-striped table-hover w-full mt-4" style={{ fontFamily: 'monospace' }}>
-        <thead className="table-dark">
-        <tr>
-          <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
-          <th style={{ width: '5%', textAlign: 'center' }}>Status</th>
-          <th style={{ width: '25.5%', textAlign: 'center' }}>Title</th> {/* Reduced width */}
-          <th style={{ width: '8%', textAlign: 'center' }}>Start Date</th>
-          <th style={{ width: '8%', textAlign: 'center' }}>End Date</th>
-          <th style={{ width: '8%', textAlign: 'center' }}>Assigned</th>
-          <th style={{ width: '25.5%', textAlign: 'center' }}>Dependency</th> {/* New column */}
-          <th style={{ width: '5%', textAlign: 'center' }}>Created By</th>
-        </tr>
-      </thead>
-        <tbody>
-         {tasks.map((task) => (
-  <tr key={task.id}>
-    <td className="text-center">
-      <button
-        onClick={() => toggleCompleted(task.id)}
-        className="bg-transparent text-yellow-500 px-2 py-1 rounded mr-1 text-lg"
-        disabled={task.completed}
-        title="Completed"
-      >
-        ✓
-      </button>
-      <button
-        onClick={() => reOpenTask(task.id)}
-        className="bg-transparent text-green-500 px-2 py-1 rounded mr-1 text-lg"
-        disabled={!task.completed}
-        title="ReOpen"
-      >
-        🚪
-      </button>
-      <button
-        onClick={() => {
-          setNewTask({ ...task, id: task.id }); // Enable inline editing
-        }}
-        className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
-        title="Edit"
-      >
-        📝
-      </button>
-      <button
-        onClick={() => deleteTask(task.id)}
-        className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
-        title="Delete"
-      >
-        ✖
-      </button>
-    </td>
-    <td className="text-center">{task.completed ? '✓' : '☐'}</td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
         <input
           type="text"
           value={newTask.title}
           onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-          className="border p-1 rounded w-full text-center"
+          placeholder="Task Title"
+          className="border p-1 rounded w-1/6"
         />
-      ) : (
-        task.title
-      )}
-    </td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
         <input
           type="date"
           min="2025-10-01"
-          max="2025-12-31"
+          max="2026-04-30"
           value={newTask.startDate}
           onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
-          className="border p-1 rounded w-full text-center"
+          className="border p-1 rounded w-1/6"
         />
-      ) : (
-        format(toZonedTime(new Date(task.startDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
-      )}
-    </td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
         <input
           type="date"
           min="2025-10-01"
-          max="2025-12-31"
+          max="2026-04-30"
           value={newTask.endDate}
           onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
-          className="border p-1 rounded w-full text-center"
+          className="border p-1 rounded w-1/6"
         />
-      ) : (
-        format(toZonedTime(new Date(task.endDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
-      )}
-    </td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
         <select
           value={newTask.assignedTo}
           onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-          className="border p-1 rounded w-full text-center"
+          className="border p-1 rounded w-1/6"
         >
           <option value="">Select User</option>
           {USERS.map((userOption, index) => (
             <option key={index} value={userOption}>{userOption}</option>
           ))}
         </select>
-      ) : (
-        task.assignedTo
-      )}
-    </td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
+        <select
+          value={newTask.phase}
+          onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
+          className="border p-1 rounded w-1/6"
+        >
+          <option value="">Select Phase</option>
+          {PHASES.map((phase, index) => (
+            <option key={index} value={phase}>{phase}</option>
+          ))}
+        </select>
         <select
           value={newTask.dependencyId}
           onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
-          className="border p-1 rounded w-full text-center"
+          className="border p-1 rounded w-1/6"
         >
-          <option value="">None</option>
-          {tasks.filter(t => t.id !== task.id).map(taskOption => (
-            <option key={taskOption.id} value={taskOption.id}>{taskOption.title}</option>
+          <option value="">Dependency</option>
+          {tasks.map(task => (
+            <option key={task.id} value={task.id}>{task.title}</option>
           ))}
         </select>
-      ) : (
-        tasks.find(t => t.id === task.dependencyId)?.title || 'None'
-      )}
-    </td>
-    <td className="text-center">{task.createdBy}</td>
-    <td className="text-center">
-      {task.id === newTask.id ? (
         <button
-          onClick={() => saveEdit(task.id, newTask)}
-          className="bg-green-500 text-white px-2 py-1 rounded text-sm"
+          onClick={addTask}
+          className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-1/6"
+          disabled={!newTask.title || !newTask.startDate || !newTask.endDate || !newTask.assignedTo || !newTask.phase}
         >
-          Save
+          Add
         </button>
-      ) : null}
-    </td>
-  </tr>
-))}
-
-
-
-
+      </div>
+      <table ref={tableRef} className="table table-striped table-hover w-full mt-4" style={{ fontFamily: 'monospace' }}>
+        <thead className="table-dark">
+          <tr>
+            <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Status</th>
+            <th style={{ width: '20%', textAlign: 'center' }}>Title</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Start Date</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>End Date</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Assigned</th>
+            <th style={{ width: '10%', textAlign: 'center' }}>Phase</th>
+            <th style={{ width: '20%', textAlign: 'center' }}>Dependency</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Created By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.id}>
+              <td className="text-center">
+                <button
+                  onClick={() => {
+                    setNewTask({ ...task, id: task.id });
+                  }}
+                  className="bg-transparent text-blue-500 px-2 py-1 rounded mr-1 text-lg"
+                  title="Edit"
+                >
+                  📝
+                </button>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="bg-transparent text-red-500 px-2 py-1 rounded text-lg"
+                  title="Delete"
+                >
+                  ✖
+                </button>
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.status}
+                    onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    {STATUSES.map((status, index) => (
+                      <option key={index} value={status}>{status}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={task.status}
+                    onChange={(e) => updateTaskStatus(task.id, e.target.value)}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    {STATUSES.map((status, index) => (
+                      <option key={index} value={status}>{status}</option>
+                    ))}
+                  </select>
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <input
+                    type="text"
+                    value={newTask.title}
+                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  />
+                ) : (
+                  task.title
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <input
+                    type="date"
+                    min="2025-10-01"
+                    max="2025-12-31"
+                    value={newTask.startDate}
+                    onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  />
+                ) : (
+                  format(toZonedTime(new Date(task.startDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <input
+                    type="date"
+                    min="2025-10-01"
+                    max="2025-12-31"
+                    value={newTask.endDate}
+                    onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  />
+                ) : (
+                  format(toZonedTime(new Date(task.endDate + 'T00:00:00-06:00'), 'America/Denver'), 'MMM dd, yy')
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.assignedTo}
+                    onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    <option value="">Select User</option>
+                    {USERS.map((userOption, index) => (
+                      <option key={index} value={userOption}>{userOption}</option>
+                    ))}
+                  </select>
+                ) : (
+                  task.assignedTo
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.phase}
+                    onChange={(e) => setNewTask({ ...newTask, phase: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    <option value="">Select Phase</option>
+                    {PHASES.map((phase, index) => (
+                      <option key={index} value={phase}>{phase}</option>
+                    ))}
+                  </select>
+                ) : (
+                  task.phase
+                )}
+              </td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <select
+                    value={newTask.dependencyId}
+                    onChange={(e) => setNewTask({ ...newTask, dependencyId: e.target.value })}
+                    className="border p-1 rounded w-full text-center"
+                  >
+                    <option value="">None</option>
+                    {tasks.filter(t => t.id !== task.id).map(taskOption => (
+                      <option key={taskOption.id} value={taskOption.id}>{taskOption.title}</option>
+                    ))}
+                  </select>
+                ) : (
+                  tasks.find(t => t.id === task.dependencyId)?.title || 'None'
+                )}
+              </td>
+              <td className="text-center">{task.createdBy}</td>
+              <td className="text-center">
+                {task.id === newTask.id ? (
+                  <button
+                    onClick={() => saveEdit(task.id, newTask)}
+                    className="bg-green-500 text-white px-2 py-1 rounded text-sm"
+                  >
+                    Save
+                  </button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
