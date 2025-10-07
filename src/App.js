@@ -807,6 +807,17 @@ function NotesSection({ notes, db, user }) {
   );
 }
 
+import { v4 as uuidv4 } from 'uuid';
+import { useEffect, useRef, useState } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import scrollGridPlugin from '@fullcalendar/scrollgrid';
+import Slider from 'react-slick';
+import { getDownloadURL, ref, uploadBytes, deleteObject } from 'firebase/storage';
+import { doc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
+import { format, toZonedTime } from 'date-fns-tz';
+
 function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const calendarRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -816,7 +827,9 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [error, setError] = useState('');
   const [uploadDate, setUploadDate] = useState('');
-  const [editingTags, setEditingTags] = useState({}); // Added missing state for editing tags
+  const [editingTags, setEditingTags] = useState({});
+  const [loadingPhotos, setLoadingPhotos] = useState(new Set());
+  const [failedPhotos, setFailedPhotos] = useState(new Set());
 
   // Filter photos for the selected date
   const dateKey = selectedDate.toISOString().split('T')[0];
@@ -824,6 +837,39 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     const photoDate = new Date(photo.createdAt).toISOString().split('T')[0];
     return photoDate === dateKey;
   });
+
+  // Regenerate URLs from filePath
+  const getPhotoUrl = async (filePath) => {
+    try {
+      const storageRef = ref(storage, filePath);
+      const url = await getDownloadURL(storageRef);
+      return url;
+    } catch (err) {
+      console.error('Failed to get URL for', filePath, err);
+      return null;
+    }
+  };
+
+  // Regenerate URLs for photos on mount or when failed
+  useEffect(() => {
+    const regenerateUrls = async () => {
+      const updatedPhotos = await Promise.all(
+        photos.map(async (photo) => {
+          if (photo.filePath && (!photo.url || failedPhotos.has(photo.id))) {
+            const url = await getPhotoUrl(photo.filePath);
+            if (url) {
+              await updateDoc(doc(db, 'photos', photo.id), { url });
+              return { ...photo, url };
+            }
+          }
+          return photo;
+        })
+      );
+      setPhotos(updatedPhotos.filter(p => p.url || p.filePath));
+      setFailedPhotos(new Set());
+    };
+    if (photos.length > 0) regenerateUrls();
+  }, [photos, db, storage, setPhotos, failedPhotos]);
 
   // Handle date click
   const handleDateClick = arg => {
@@ -857,28 +903,36 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     }
     try {
       const dateStr = uploadDate;
-      console.log('Uploading photos for date:', dateStr, 'by user:', user.email);
+      console.log('Uploading photos for date:', dateStr);
       const newPhotos = [];
       const uploadPromises = uploadFiles.map(async file => {
-        console.log('Uploading file:', file.name);
-        const storageRef = ref(storage, `photos/${user.email}/${dateStr}/${file.name}`);
+        const fileName = `${uuidv4()}.jpg`;
+        const filePath = `photos/shared/${dateStr}/${fileName}`;
+        console.log('Uploading to path:', filePath);
+        const storageRef = ref(storage, filePath);
+        setLoadingPhotos(prev => new Set([...prev, fileName]));
         const snapshot = await uploadBytes(storageRef, file);
         const url = await getDownloadURL(snapshot.ref);
         const tag = tags[file.name] || '';
         const docRef = await addDoc(collection(db, 'photos'), {
+          filePath,
           url,
           createdBy: user.email,
           createdAt: dateStr,
           tag,
+          extension: 'jpg',
         });
         console.log('Added Firestore doc:', docRef.id);
         newPhotos.push({
           id: docRef.id,
+          filePath,
           url,
           createdBy: user.email,
           createdAt: dateStr,
           tag,
+          extension: 'jpg',
         });
+        setLoadingPhotos(prev => new Set([...prev].filter(id => id !== fileName)));
       });
       await Promise.all(uploadPromises);
       setPhotos(prev => {
@@ -919,15 +973,11 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     if (!window.confirm('Delete this photo?')) return;
     try {
       const photo = photos.find(p => p.id === photoId);
-      if (!photo) throw new Error('Photo not found in state');
-      const decodedUrl = decodeURIComponent(photo.url);
-      const fileName = decodedUrl.split('/').pop().split('?')[0];
-      console.log('Deleting photo:', { photoId, url: photo.url, fileName, date: photo.createdAt });
-      const storagePath = `photos/${user.email}/${new Date(photo.createdAt).toISOString().split('T')[0]}/${fileName}`;
-      console.log('Storage path:', storagePath);
-      const storageRef = ref(storage, storagePath);
+      if (!photo) throw new Error('Photo not found');
+      const filePath = photo.filePath || `photos/${user.email}/${photo.createdAt}/${decodeURIComponent(photo.url).split('/').pop().split('?')[0]}`;
+      const storageRef = ref(storage, filePath);
       await deleteObject(storageRef);
-      console.log('Deleted from Storage:', storagePath);
+      console.log('Deleted from Storage:', filePath);
       await deleteDoc(doc(db, 'photos', photoId));
       console.log('Deleted from Firestore:', photoId);
       setPhotos(prev => prev.filter(p => p.id !== photoId));
@@ -937,7 +987,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     }
   };
 
-  // Open carousel at specific index
+  // Open carousel
   const openCarousel = idx => {
     setCarouselIndex(idx);
     setIsCarouselOpen(true);
@@ -953,24 +1003,24 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     afterChange: cur => setCarouselIndex(cur),
   };
 
-  // Calendar events with camera icon
+  // Calendar events
   const events = photos.map(photo => {
-    // Ensure date is treated as local by splitting the ISO string
     const [year, month, day] = photo.createdAt.split('-');
-    const localDate = new Date(year, month - 1, day); // month is 0-based
+    const localDate = new Date(year, month - 1, day);
     return {
-      title: '', // No title to avoid text display
+      title: '',
       start: localDate,
       allDay: true,
       classNames: ['photo-day'],
     };
   });
 
+  const placeholderImg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg">
       <center><h2 className="text-2xl font-bold text-gray-800 mb-4">Project Calendar</h2></center>
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      {/* FullCalendar */}
       <div className="mb-6">
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin, scrollGridPlugin]}
@@ -983,7 +1033,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
           schedulerLicenseKey="GPL-My-Project-Is-Open-Source"
         />
       </div>
-      {/* Upload UI */}
       <div className="mb-6 bg-gray-50 p-4 rounded-lg shadow-inner">
         <input
           type="date"
@@ -1016,16 +1065,22 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
           Upload Photos
         </button>
       </div>
-      {/* Thumbnail Grid */}
       {filteredPhotos.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-6">
           {filteredPhotos.map((photo, idx) => (
             <div key={photo.id} className="relative">
               <img
-                src={photo.url}
+                src={photo.url || placeholderImg}
                 alt={photo.tag || 'Photo'}
-                className="w-full h-96 md:h-[512px] object-contain rounded cursor-pointer"
+                className={`w-full h-96 md:h-[512px] object-contain rounded cursor-pointer ${loadingPhotos.has(photo.id) ? 'animate-pulse bg-gray-200' : ''}`}
                 onClick={() => openCarousel(idx)}
+                onLoad={() => setLoadingPhotos(prev => new Set([...prev].filter(id => id !== photo.id)))}
+                onError={(e) => {
+                  console.warn('Image load failed for', photo.filePath || photo.url);
+                  e.target.src = placeholderImg;
+                  setFailedPhotos(prev => new Set([...prev, photo.id]));
+                }}
+                loading="lazy"
               />
               <div className="text-center mt-1">
                 <input
@@ -1048,11 +1103,15 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
               >
                 X
               </button>
+              {photo.filePath && (
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {photo.filePath.split('/').pop()}
+                </p>
+              )}
             </div>
           ))}
         </div>
       )}
-      {/* Carousel Modal */}
       {isCarouselOpen && filteredPhotos.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-5xl">
@@ -1060,9 +1119,14 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
               {filteredPhotos.map(photo => (
                 <div key={photo.id} className="p-4">
                   <img
-                    src={photo.url}
+                    src={photo.url || placeholderImg}
                     alt={photo.tag || 'Photo'}
                     className="w-full h-[768px] md:h-[1000px] object-contain rounded-lg"
+                    onError={(e) => {
+                      e.target.src = placeholderImg;
+                      setFailedPhotos(prev => new Set([...prev, photo.id]));
+                    }}
+                    loading="lazy"
                   />
                   <div className="text-center mt-2">
                     <input
@@ -1078,6 +1142,11 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
                     >
                       Save Tag
                     </button>
+                    {photo.filePath && (
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        {photo.filePath.split('/').pop()}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => deletePhoto(photo.id)}
