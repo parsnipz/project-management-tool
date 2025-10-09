@@ -266,6 +266,26 @@ function GanttChart({ tasks, db, user, setTasks }) {
           },
           plugins: {
             legend: { display: false },
+            tooltip: {
+              enabled: true,
+              callbacks: {
+                title: (tooltipItems) => {
+                  const index = tooltipItems[0].dataIndex;
+                  return sortedTasks[index]?.title || 'Task';
+                },
+                label: (context) => {
+                  const index = context.dataIndex;
+                  const task = sortedTasks[index];
+                  const dependency = task.dependencyId ? tasks.find(t => t.id === task.dependencyId)?.title || 'None' : 'None';
+                  return [
+                    `Phase: ${task.phase || 'N/A'}`,
+                    `Assigned: ${task.assignedTo || 'N/A'}`,
+                    `Dependency: ${dependency}`,
+                    `Status: ${task.status || 'Not Started'}`
+                  ];
+                }
+              }
+            }
           },
           onHover: (event, elements) => {
             if (elements.length > 0) {
@@ -274,7 +294,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
               if (taskTitle && tableRef.current) {
                 const rows = tableRef.current.getElementsByTagName('tr');
                 for (let row of rows) {
-                  if (row.cells[1].textContent === taskTitle) { // Changed to index 1 for Task (title)
+                  if (row.cells[1].textContent === taskTitle) {
                     row.style.backgroundColor = 'rgba(255, 255, 204, 0.5)';
                   } else {
                     row.style.backgroundColor = '';
@@ -292,7 +312,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
       });
       return () => chart.destroy();
     }
-  }, [sortedTasks, userColors]);
+  }, [sortedTasks, userColors, tasks]);
 
   const adjustTransparency = (color, opacity) => {
     const rgba = color.match(/\d+\.?\d*/g);
@@ -372,7 +392,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
 
   return (
     <div className="bg-white p-4 rounded shadow">
-      <center><h2 className="text-xl font-semibold mb-2">Gantt Chart (Oct 1, 2025 - Dec 31, 2026)</h2></center>
+      <center><h2 className="text-xl font-semibold mb-2">Gantt Chart (Oct 1, 2025 - Dec 31, 2025)</h2></center>
       <canvas ref={canvasRef} style={{ width: '100%', height: '200px' }}></canvas>
       <div className="mt-2">
         <strong>Legend:</strong>
@@ -416,7 +436,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
         <input
           type="date"
           min="2025-10-01"
-          max="2026-04-30"
+          max="2025-12-31"
           value={newTask.startDate}
           onChange={(e) => setNewTask({ ...newTask, startDate: e.target.value })}
           className="border p-1 rounded w-1/6"
@@ -424,7 +444,7 @@ function GanttChart({ tasks, db, user, setTasks }) {
         <input
           type="date"
           min="2025-10-01"
-          max="2026-04-30"
+          max="2025-12-31"
           value={newTask.endDate}
           onChange={(e) => setNewTask({ ...newTask, endDate: e.target.value })}
           className="border p-1 rounded w-1/6"
