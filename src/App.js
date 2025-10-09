@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import FullCalendar from '@fullcalendar/react';
@@ -1126,7 +1126,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
         }
         .photo-day .fc-daygrid-day-number::after {
           content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="red" viewBox="0 0 24 24"><path d="M21 3h-3V2a1 1 0 0 0-2 0v1h-4V2a1 1 0 0 0-2 0v1H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-1 14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8h12v9zm-4-5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>');
-          position: absolute;
+          position: relative;
           top: -8px;
           right: -8px;
         }
