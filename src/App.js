@@ -823,15 +823,8 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const [loadingPhotos, setLoadingPhotos] = useState(new Set());
   const [failedPhotos, setFailedPhotos] = useState(new Set());
 
-  // Filter photos for the selected date
-  const dateKey = selectedDate.toISOString().split('T')[0];
-  const filteredPhotos = photos.filter(photo => {
-    const photoDate = new Date(photo.createdAt).toISOString().split('T')[0];
-    return photoDate === dateKey;
-  });
-
   // Regenerate URLs from filePath
-  const getPhotoUrl = async (filePath) => {
+  const getPhotoUrl = useCallback(async (filePath) => {
     try {
       const storageRef = ref(storage, filePath);
       const url = await getDownloadURL(storageRef);
@@ -840,7 +833,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
       console.error('Failed to get URL for', filePath, err);
       return null;
     }
-  };
+  }, [storage]);
 
   // Regenerate URLs for photos on mount or when failed
   useEffect(() => {
@@ -861,7 +854,14 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
       setFailedPhotos(new Set());
     };
     if (photos.length > 0) regenerateUrls();
-  }, [photos, db, storage, setPhotos, failedPhotos]);
+  }, [photos, db, storage, setPhotos, failedPhotos, getPhotoUrl]);
+
+  // Filter photos for the selected date
+  const dateKey = selectedDate.toISOString().split('T')[0];
+  const filteredPhotos = photos.filter(photo => {
+    const photoDate = new Date(photo.createdAt).toISOString().split('T')[0];
+    return photoDate === dateKey;
+  });
 
   // Handle date click
   const handleDateClick = arg => {
