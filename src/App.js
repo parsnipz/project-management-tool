@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import FullCalendar from '@fullcalendar/react';
@@ -818,6 +818,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [error, setError] = useState('');
   const [uploadDate, setUploadDate] = useState('');
+  const [uploadProgress, setUploadProgress] = useState({});
 
   // Filter photos for the selected date
   const dateKey = selectedDate.toISOString().split('T')[0];
@@ -833,12 +834,14 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
     setTags({});
     setUploadDate(arg.date.toISOString().split('T')[0]);
     setError('');
+    setUploadProgress({});
   };
 
   // Handle file selection
   const handleFileChange = e => {
     setUploadFiles(Array.from(e.target.files));
     setError('');
+    setUploadProgress({});
   };
 
   // Handle upload date change
@@ -846,7 +849,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
     setUploadDate(e.target.value);
   };
 
-  // Upload photos
+  // Upload photos with progress
   const uploadPhotos = async () => {
     if (!uploadFiles.length) {
       setError('No files selected.');
@@ -865,8 +868,23 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
         const filePath = `photos/${dateStr}/${fileName}`;
         console.log('Uploading to path:', filePath);
         const storageRef = ref(storage, filePath);
-        await uploadBytes(storageRef, file);
-        const url = `https://storage.googleapis.com/${storage._bucket}/${filePath}`;
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        // Track upload progress
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(prev => ({ ...prev, [fileName]: progress.toFixed(0) }));
+          },
+          (err) => {
+            console.error('Upload error for', fileName, ':', err);
+            setError(`Upload failed for ${fileName}: ${err.message}`);
+          }
+        );
+
+        await uploadTask;
+        const url = `https://storage.googleapis.com/project-management-tool-32f09.appspot.com/${filePath}`;
+        console.log('Generated URL:', url);
         const tag = tags[file.name] || '';
         const docRef = await addDoc(collection(db, 'photos'), {
           filePath,
@@ -892,6 +910,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
       setUploadFiles([]);
       setTags({});
       setUploadDate(selectedDate.toISOString().split('T')[0]);
+      setUploadProgress({});
       setError('');
     } catch (err) {
       console.error('Upload failed:', err);
@@ -1000,8 +1019,26 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
             value={tags[uploadFiles[0]?.name] || ''}
             onChange={e => setTags({ ...tags, [uploadFiles[0].name]: e.target.value })}
             placeholder="Tag (optional)"
-            className="border border-gray-300 p-2 rounded-lg w-full mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="border border-gray-300 p-2 rounded-lg w-full mb-2 focus:outline-none focus:ring-2 focus:ring-green-500"
           />
+        )}
+        {uploadFiles.length > 0 && (
+          <div className="mb-2">
+            {uploadFiles.map(file => (
+              <div key={file.name} className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">{file.name}</span>
+                <div className="w-full bg-gray-200 rounded h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded"
+                    style={{ width: `${uploadProgress[file.name] || 0}%` }}
+                  ></div>
+                </div>
+                <span className="text-sm text-gray-600">
+                  {uploadProgress[file.name] ? `${uploadProgress[file.name]}%` : 'Waiting'}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
         <button
           onClick={uploadPhotos}
@@ -1021,7 +1058,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
                 className="w-full h-96 md:h-[512px] object-contain rounded cursor-pointer"
                 onClick={() => openCarousel(idx)}
                 onError={(e) => {
-                  console.warn('Image load failed for', photo.filePath);
+                  console.warn('Image load failed for', photo.filePath, 'URL:', photo.url);
                   e.target.src = placeholderImg;
                 }}
                 loading="lazy"
@@ -1059,7 +1096,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
                     alt={photo.tag || 'Photo'}
                     className="w-full h-[768px] md:h-[1000px] object-contain rounded-lg"
                     onError={(e) => {
-                      console.warn('Image load failed for', photo.filePath);
+                      console.warn('Image load failed for', photo.filePath, 'URL:', photo.url);
                       e.target.src = placeholderImg;
                     }}
                     loading="lazy"
