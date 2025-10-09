@@ -1,20 +1,19 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
-import FullCalendar from '@fullcalendar/react'; // Correct import
+import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import scrollGridPlugin from '@fullcalendar/scrollgrid'; // New import for ScrollGrid
+import scrollGridPlugin from '@fullcalendar/scrollgrid';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import './App.css';
 import { toZonedTime, format } from 'date-fns-tz';
-import { v4 as uuidv4 } from 'uuid';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDIngY4WuK5MZHhymOcbgMB0usEJkNyfz4",
@@ -823,39 +822,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const [loadingPhotos, setLoadingPhotos] = useState(new Set());
   const [failedPhotos, setFailedPhotos] = useState(new Set());
 
-  // Regenerate URLs from filePath
-  const getPhotoUrl = useCallback(async (filePath) => {
-    try {
-      const storageRef = ref(storage, filePath);
-      const url = await getDownloadURL(storageRef);
-      return url;
-    } catch (err) {
-      console.error('Failed to get URL for', filePath, err);
-      return null;
-    }
-  }, [storage]);
-
-  // Regenerate URLs for photos on mount or when failed
-  useEffect(() => {
-    const regenerateUrls = async () => {
-      const updatedPhotos = await Promise.all(
-        photos.map(async (photo) => {
-          if (photo.filePath && (!photo.url || failedPhotos.has(photo.id))) {
-            const url = await getPhotoUrl(photo.filePath);
-            if (url) {
-              await updateDoc(doc(db, 'photos', photo.id), { url });
-              return { ...photo, url };
-            }
-          }
-          return photo;
-        })
-      );
-      setPhotos(updatedPhotos.filter(p => p.url || p.filePath));
-      setFailedPhotos(new Set());
-    };
-    if (photos.length > 0) regenerateUrls();
-  }, [photos, db, storage, setPhotos, failedPhotos, getPhotoUrl]);
-
   // Filter photos for the selected date
   const dateKey = selectedDate.toISOString().split('T')[0];
   const filteredPhotos = photos.filter(photo => {
@@ -898,31 +864,27 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
       console.log('Uploading photos for date:', dateStr);
       const newPhotos = [];
       const uploadPromises = uploadFiles.map(async file => {
-        const fileName = `${uuidv4()}.jpg`;
-        const filePath = `photos/shared/${dateStr}/${fileName}`;
+        const fileName = file.name;
+        const filePath = `photos/${dateStr}/${fileName}`;
         console.log('Uploading to path:', filePath);
         const storageRef = ref(storage, filePath);
         setLoadingPhotos(prev => new Set([...prev, fileName]));
         const snapshot = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(snapshot.ref);
+        const url = `https://storage.googleapis.com/${storage._bucket}/${filePath}`;
         const tag = tags[file.name] || '';
         const docRef = await addDoc(collection(db, 'photos'), {
           filePath,
           url,
-          createdBy: user.email,
           createdAt: dateStr,
           tag,
-          extension: 'jpg',
         });
         console.log('Added Firestore doc:', docRef.id);
         newPhotos.push({
           id: docRef.id,
           filePath,
           url,
-          createdBy: user.email,
           createdAt: dateStr,
           tag,
-          extension: 'jpg',
         });
         setLoadingPhotos(prev => new Set([...prev].filter(id => id !== fileName)));
       });
@@ -966,7 +928,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     try {
       const photo = photos.find(p => p.id === photoId);
       if (!photo) throw new Error('Photo not found');
-      const filePath = photo.filePath || `photos/${user.email}/${photo.createdAt}/${decodeURIComponent(photo.url).split('/').pop().split('?')[0]}`;
+      const filePath = photo.filePath || `photos/${photo.createdAt}/${decodeURIComponent(photo.url).split('/').pop().split('?')[0]}`;
       const storageRef = ref(storage, filePath);
       await deleteObject(storageRef);
       console.log('Deleted from Storage:', filePath);
