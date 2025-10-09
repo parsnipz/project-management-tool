@@ -883,7 +883,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
         );
 
         await uploadTask;
-        const url = `https://storage.googleapis.com/project-management-tool-32f09.appspot.com/${filePath}`;
+        const url = `https://storage.googleapis.com/project-management-tool-32f09.firebasestorage.app/${filePath}`;
         console.log('Generated URL:', url);
         const tag = tags[file.name] || '';
         const docRef = await addDoc(collection(db, 'photos'), {
