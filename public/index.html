@@ -17,16 +17,16 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <!-- Content Security Policy -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="
-        script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://www.gstatic.com;
-        connect-src 'self' https://www.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://drive.google.com https://firebasestorage.googleapis.com;
-        img-src 'self' data: https://firebasestorage.googleapis.com https://placehold.co;
-        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
-        font-src 'self' https://cdn.jsdelivr.net;
-      "
-    />
+<meta
+  http-equiv="Content-Security-Policy"
+  content="
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://www.gstatic.com;
+    connect-src 'self' https://www.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://drive.google.com https://firebasestorage.googleapis.com https://storage.googleapis.com;
+    img-src 'self' data: https://firebasestorage.googleapis.com https://storage.googleapis.com https://placehold.co;
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    font-src 'self' https://cdn.jsdelivr.net;
+  "
+/>
 
     <!-- Google Identity Services Script -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
