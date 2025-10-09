@@ -14,6 +14,7 @@ import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import './App.css';
 import { toZonedTime, format } from 'date-fns-tz';
+import { v4 as uuidv4 } from 'uuid';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDIngY4WuK5MZHhymOcbgMB0usEJkNyfz4",
@@ -807,16 +808,7 @@ function NotesSection({ notes, db, user }) {
   );
 }
 
-import { v4 as uuidv4 } from 'uuid';
-import { useEffect, useRef, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import scrollGridPlugin from '@fullcalendar/scrollgrid';
-import Slider from 'react-slick';
-import { getDownloadURL, ref, uploadBytes, deleteObject } from 'firebase/storage';
-import { doc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
-import { format, toZonedTime } from 'date-fns-tz';
+
 
 function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const calendarRef = useRef(null);
