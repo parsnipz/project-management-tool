@@ -865,7 +865,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
         const filePath = `photos/${dateStr}/${fileName}`;
         console.log('Uploading to path:', filePath);
         const storageRef = ref(storage, filePath);
-        const snapshot = await uploadBytes(storageRef, file);
+        await uploadBytes(storageRef, file);
         const url = `https://storage.googleapis.com/${storage._bucket}/${filePath}`;
         const tag = tags[file.name] || '';
         const docRef = await addDoc(collection(db, 'photos'), {
@@ -1034,12 +1034,6 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
                   placeholder="Enter tag"
                   className="border border-gray-300 p-1 rounded w-full text-center text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <button
-                  onClick={() => updatePhotoTag(photo.id, photo.tag ?? '')}
-                  className="mt-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-sm"
-                >
-                  Save Tag
-                </button>
                 <p className="text-xs text-gray-500 mt-1 truncate">
                   {photo.filePath.split('/').pop()}
                 </p>
@@ -1078,12 +1072,6 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
                       placeholder="Enter tag"
                       className="border border-gray-300 p-1 rounded w-full text-center text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
-                    <button
-                      onClick={() => updatePhotoTag(photo.id, photo.tag ?? '')}
-                      className="mt-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-                    >
-                      Save Tag
-                    </button>
                     <p className="text-xs text-gray-500 mt-1 truncate">
                       {photo.filePath.split('/').pop()}
                     </p>
