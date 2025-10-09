@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import FullCalendar from '@fullcalendar/react';
@@ -1115,6 +1115,7 @@ function CalendarSection({ photos, db, storage, setPhotos }) {
     </div>
   );
 }
+
 
 
 
