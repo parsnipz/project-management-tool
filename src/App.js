@@ -820,6 +820,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const [uploadDate, setUploadDate] = useState('');
   const [editingTags, setEditingTags] = useState({});
   const [loadingPhotos, setLoadingPhotos] = useState(new Set());
+    // eslint-disable-next-line no-unused-vars
   const [failedPhotos, setFailedPhotos] = useState(new Set());
 
   // Filter photos for the selected date
@@ -869,6 +870,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
         console.log('Uploading to path:', filePath);
         const storageRef = ref(storage, filePath);
         setLoadingPhotos(prev => new Set([...prev, fileName]));
+          // eslint-disable-next-line no-unused-vars
         const snapshot = await uploadBytes(storageRef, file);
         const url = `https://storage.googleapis.com/${storage._bucket}/${filePath}`;
         const tag = tags[file.name] || '';
