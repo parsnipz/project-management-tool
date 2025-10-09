@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, deleteObject } from 'firebase/storage';
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import FullCalendar from '@fullcalendar/react';
@@ -809,7 +809,7 @@ function NotesSection({ notes, db, user }) {
 
 
 
-function CalendarSection({ photos, db, storage, user, setPhotos }) {
+function CalendarSection({ photos, db, storage, setPhotos }) {
   const calendarRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadFiles, setUploadFiles] = useState([]);
@@ -818,10 +818,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [error, setError] = useState('');
   const [uploadDate, setUploadDate] = useState('');
-  const [editingTags, setEditingTags] = useState({});
-  const [loadingPhotos, setLoadingPhotos] = useState(new Set());
-    // eslint-disable-next-line no-unused-vars
-  const [failedPhotos, setFailedPhotos] = useState(new Set());
 
   // Filter photos for the selected date
   const dateKey = selectedDate.toISOString().split('T')[0];
@@ -869,8 +865,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
         const filePath = `photos/${dateStr}/${fileName}`;
         console.log('Uploading to path:', filePath);
         const storageRef = ref(storage, filePath);
-        setLoadingPhotos(prev => new Set([...prev, fileName]));
-          // eslint-disable-next-line no-unused-vars
         const snapshot = await uploadBytes(storageRef, file);
         const url = `https://storage.googleapis.com/${storage._bucket}/${filePath}`;
         const tag = tags[file.name] || '';
@@ -888,7 +882,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
           createdAt: dateStr,
           tag,
         });
-        setLoadingPhotos(prev => new Set([...prev].filter(id => id !== fileName)));
       });
       await Promise.all(uploadPromises);
       setPhotos(prev => {
@@ -916,8 +909,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
           photo.id === photoId ? { ...photo, tag: newTag } : photo
         )
       );
-      setEditingTags(prev => ({ ...prev, [photoId]: undefined }));
-      setError('');
     } catch (err) {
       console.error('Tag update failed:', err);
       setError('Failed to update tag: ' + err.message);
@@ -930,10 +921,9 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
     try {
       const photo = photos.find(p => p.id === photoId);
       if (!photo) throw new Error('Photo not found');
-      const filePath = photo.filePath || `photos/${photo.createdAt}/${decodeURIComponent(photo.url).split('/').pop().split('?')[0]}`;
-      const storageRef = ref(storage, filePath);
+      const storageRef = ref(storage, photo.filePath);
       await deleteObject(storageRef);
-      console.log('Deleted from Storage:', filePath);
+      console.log('Deleted from Storage:', photo.filePath);
       await deleteDoc(doc(db, 'photos', photoId));
       console.log('Deleted from Firestore:', photoId);
       setPhotos(prev => prev.filter(p => p.id !== photoId));
@@ -1028,30 +1018,31 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
               <img
                 src={photo.url || placeholderImg}
                 alt={photo.tag || 'Photo'}
-                className={`w-full h-96 md:h-[512px] object-contain rounded cursor-pointer ${loadingPhotos.has(photo.id) ? 'animate-pulse bg-gray-200' : ''}`}
+                className="w-full h-96 md:h-[512px] object-contain rounded cursor-pointer"
                 onClick={() => openCarousel(idx)}
-                onLoad={() => setLoadingPhotos(prev => new Set([...prev].filter(id => id !== photo.id)))}
                 onError={(e) => {
-                  console.warn('Image load failed for', photo.filePath || photo.url);
+                  console.warn('Image load failed for', photo.filePath);
                   e.target.src = placeholderImg;
-                  setFailedPhotos(prev => new Set([...prev, photo.id]));
                 }}
                 loading="lazy"
               />
               <div className="text-center mt-1">
                 <input
                   type="text"
-                  value={editingTags[photo.id] ?? photo.tag ?? ''}
-                  onChange={e => setEditingTags({ ...editingTags, [photo.id]: e.target.value })}
+                  value={photo.tag ?? ''}
+                  onChange={e => updatePhotoTag(photo.id, e.target.value)}
                   placeholder="Enter tag"
                   className="border border-gray-300 p-1 rounded w-full text-center text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <button
-                  onClick={() => updatePhotoTag(photo.id, editingTags[photo.id] ?? photo.tag ?? '')}
+                  onClick={() => updatePhotoTag(photo.id, photo.tag ?? '')}
                   className="mt-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-sm"
                 >
                   Save Tag
                 </button>
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {photo.filePath.split('/').pop()}
+                </p>
               </div>
               <button
                 onClick={() => deletePhoto(photo.id)}
@@ -1059,11 +1050,6 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
               >
                 X
               </button>
-              {photo.filePath && (
-                <p className="text-xs text-gray-500 mt-1 truncate">
-                  {photo.filePath.split('/').pop()}
-                </p>
-              )}
             </div>
           ))}
         </div>
@@ -1079,30 +1065,28 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
                     alt={photo.tag || 'Photo'}
                     className="w-full h-[768px] md:h-[1000px] object-contain rounded-lg"
                     onError={(e) => {
+                      console.warn('Image load failed for', photo.filePath);
                       e.target.src = placeholderImg;
-                      setFailedPhotos(prev => new Set([...prev, photo.id]));
                     }}
                     loading="lazy"
                   />
                   <div className="text-center mt-2">
                     <input
                       type="text"
-                      value={editingTags[photo.id] ?? photo.tag ?? ''}
-                      onChange={e => setEditingTags({ ...editingTags, [photo.id]: e.target.value })}
+                      value={photo.tag ?? ''}
+                      onChange={e => updatePhotoTag(photo.id, e.target.value)}
                       placeholder="Enter tag"
                       className="border border-gray-300 p-1 rounded w-full text-center text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                     <button
-                      onClick={() => updatePhotoTag(photo.id, editingTags[photo.id] ?? photo.tag ?? '')}
+                      onClick={() => updatePhotoTag(photo.id, photo.tag ?? '')}
                       className="mt-1 bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
                     >
                       Save Tag
                     </button>
-                    {photo.filePath && (
-                      <p className="text-xs text-gray-500 mt-1 truncate">
-                        {photo.filePath.split('/').pop()}
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-1 truncate">
+                      {photo.filePath.split('/').pop()}
+                    </p>
                   </div>
                   <button
                     onClick={() => deletePhoto(photo.id)}
@@ -1128,7 +1112,7 @@ function CalendarSection({ photos, db, storage, user, setPhotos }) {
         }
         .photo-day .fc-daygrid-day-number::after {
           content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="red" viewBox="0 0 24 24"><path d="M21 3h-3V2a1 1 0 0 0-2 0v1h-4V2a1 1 0 0 0-2 0v1H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-1 14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V8h12v9zm-4-5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>');
-          position: relative;
+          position: absolute;
           top: -8px;
           right: -8px;
         }
